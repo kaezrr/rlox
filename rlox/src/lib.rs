@@ -2,47 +2,68 @@ mod token;
 
 use std::{error::Error, io::Write, path::Path};
 
-struct Lox;
+use crate::token::Scanner;
+
+#[derive(Default)]
+pub struct Lox {
+    had_error: bool,
+}
 
 impl Lox {
-    pub fn run_file(path: &Path) -> Result<(), Box<dyn Error>> {
-        let lines = std::fs::read_to_string(path)?;
-        Lox::run(lines)
-    }
+    pub fn run_file(&mut self, path: &Path) {
+        let lines = std::fs::read_to_string(path).expect("read file");
 
-    pub fn run_prompt() -> Result<(), Box<dyn Error>> {
-        loop {
-            print!("> ");
-            std::io::stdout().flush()?;
+        self.run(lines);
 
-            let mut read_line = String::new();
-            std::io::stdin().read_line(&mut read_line)?;
-
-            if read_line.is_empty() {
-                return Ok(());
-            }
-
-            if let Err(err) = Lox::run(read_line) {
-                eprintln!("{err}")
-            }
+        if self.had_error {
+            std::process::exit(65);
         }
     }
 
-    pub fn error(line: usize, message: &str) -> String {
-        report(line, "", message)
+    pub fn run_prompt(&mut self) {
+        loop {
+            print!("> ");
+            std::io::stdout().flush().expect("flush io");
+
+            let line = read_line();
+            if line.is_empty() {
+                break;
+            }
+
+            self.run(line);
+
+            self.had_error = false;
+        }
+    }
+
+    fn run(&mut self, source: String) {
+        let mut scanner = Scanner::new(
+            source,
+            Box::new(|line, message| {
+                self.error(line, message);
+            }),
+        );
+
+        let tokens = scanner.scan_tokens();
+        for token in tokens {
+            println!("{token}");
+        }
+    }
+
+    pub fn error(&mut self, line: usize, message: &str) {
+        self.report(line, "", message);
+    }
+
+    fn report(&mut self, line: usize, place: &str, message: &str) {
+        eprintln!("[line {line}] Error {place}: {message}");
+        self.had_error = true;
     }
 }
 
-fn run(source: String) -> Result<(), Box<dyn Error>> {
-    let tokens = source.lines();
-
-    for token in tokens {
-        println!("{token}");
-    }
-
-    Ok(())
-}
-
-fn report(line: usize, place: &str, message: &str) -> String {
-    format!("[line {line}] Error {place}: {message}")
+fn read_line() -> String {
+    let mut read_line = String::new();
+    std::io::stdin()
+        .read_line(&mut read_line)
+        .expect("read line");
+    read_line
 }

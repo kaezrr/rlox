@@ -1,11 +1,15 @@
-use std::{error::Error, path::Path};
+use std::path::Path;
 
-fn main() -> Result<(), Box<dyn Error>> {
+use rlox::Lox;
+
+fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
+    let mut lox = Lox::default();
+
     match args.len() {
-        0 => rlox::run_prompt(),
-        1 => rlox::run_file(Path::new(&args[0])),
-        _ => Err("Usage: rlox [script]".into()),
-    }
+        0 => lox.run_prompt(),
+        1 => lox.run_file(Path::new(&args[0])),
+        _ => eprintln!("Usage: rlox [script]"),
+    };
 }
