@@ -1,6 +1,6 @@
 mod token;
 
-use std::{error::Error, io::Write, path::Path};
+use std::{io::Write, path::Path};
 
 use crate::token::Scanner;
 

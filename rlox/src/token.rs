@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
 pub struct Scanner<'a> {
     source: Vec<u8>,
@@ -72,6 +72,28 @@ impl<'a> Scanner<'a> {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
+                } else if self.advance_if('*') {
+                    // Slash star means multi-line comment
+                    while !self.is_at_end() {
+                        if self.peek() == '*' && self.peek_next() == '/' {
+                            break;
+                        }
+
+                        if self.peek() == '\n' {
+                            self.line += 1;
+                        }
+
+                        self.advance();
+                    }
+
+                    if self.is_at_end() {
+                        self.error(self.line, "Unterminated multi-line comment");
+                        return;
+                    }
+
+                    // Consume the terminating star and slash
+                    self.advance();
+                    self.advance();
                 } else {
                     self.add_token(TokenType::Slash)
                 }
@@ -89,8 +111,9 @@ impl<'a> Scanner<'a> {
                     self.number();
                 } else if is_alpha(ch) {
                     self.identifier();
+                } else {
+                    self.error(self.line, "Unexpected character");
                 }
-                self.error(self.line, "Unexpected character");
             }
         }
     }
@@ -100,10 +123,9 @@ impl<'a> Scanner<'a> {
             self.advance();
         }
 
-        let bytes = self.source[self.start..self.current].to_owned();
-        let value = unsafe { String::from_utf8_unchecked(bytes) };
-
-        self.add_token_literal(TokenType::Identifier, Some(Literal::Identifier(value)));
+        let bytes = &self.source[self.start..self.current];
+        let text = unsafe { str::from_utf8_unchecked(bytes) };
+        self.add_token(try_keyword(text).unwrap_or(TokenType::Identifier));
     }
 
     fn number(&mut self) {
@@ -119,8 +141,8 @@ impl<'a> Scanner<'a> {
             }
         }
 
-        let bytes = self.source[self.start..self.current].to_owned();
-        let number = unsafe { String::from_utf8_unchecked(bytes) }
+        let bytes = &self.source[self.start..self.current];
+        let number = unsafe { str::from_utf8_unchecked(bytes) }
             .parse()
             .expect("Parse f64");
 
@@ -143,8 +165,8 @@ impl<'a> Scanner<'a> {
         // The closing ".
         self.advance();
 
-        let bytes = self.source[(self.start + 1)..(self.current - 1)].to_owned();
-        let value = unsafe { String::from_utf8_unchecked(bytes) };
+        let bytes = &self.source[(self.start + 1)..(self.current - 1)];
+        let value = unsafe { str::from_utf8_unchecked(bytes) }.to_string();
 
         self.add_token_literal(TokenType::String, Some(Literal::String(value)));
     }
@@ -233,6 +255,28 @@ impl Display for Token {
     }
 }
 
+fn try_keyword(keyword_str: &str) -> Option<TokenType> {
+    match keyword_str {
+        "and" => Some(TokenType::And),
+        "class" => Some(TokenType::Class),
+        "else" => Some(TokenType::Else),
+        "false" => Some(TokenType::False),
+        "for" => Some(TokenType::For),
+        "fun" => Some(TokenType::Fun),
+        "if" => Some(TokenType::If),
+        "nil" => Some(TokenType::Nil),
+        "or" => Some(TokenType::Or),
+        "print" => Some(TokenType::Print),
+        "return" => Some(TokenType::Return),
+        "super" => Some(TokenType::Super),
+        "this" => Some(TokenType::This),
+        "true" => Some(TokenType::True),
+        "var" => Some(TokenType::Var),
+        "while" => Some(TokenType::While),
+        _ => None,
+    }
+}
+
 #[derive(Debug)]
 enum TokenType {
     // Single character
@@ -258,8 +302,9 @@ enum TokenType {
     Less,
     LessEqual,
 
-    // Literals
     Identifier,
+
+    // Literals
     String,
     Number,
 
@@ -288,5 +333,4 @@ enum TokenType {
 enum Literal {
     Number(f64),
     String(String),
-    Identifier(String),
 }
