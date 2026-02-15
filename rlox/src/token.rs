@@ -236,13 +236,23 @@ pub struct Token {
 }
 
 impl Token {
-    fn new(token_type: TokenType, lexeme: String, literal: Option<Literal>, line: usize) -> Self {
+    pub fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<Literal>,
+        line: usize,
+    ) -> Self {
         Self {
             token_type,
             lexeme,
             literal,
             line,
         }
+    }
+
+    #[inline(always)]
+    pub fn lexeme(&self) -> &String {
+        &self.lexeme
     }
 }
 
@@ -278,7 +288,7 @@ fn try_keyword(keyword_str: &str) -> Option<TokenType> {
 }
 
 #[derive(Debug)]
-enum TokenType {
+pub enum TokenType {
     // Single character
     LeftParen,
     RightParen,
@@ -330,7 +340,16 @@ enum TokenType {
 }
 
 #[derive(Debug, PartialEq)]
-enum Literal {
+pub enum Literal {
     Number(f64),
     String(String),
+}
+
+impl Literal {
+    pub fn value(&self) -> String {
+        match self {
+            Literal::Number(v) => v.to_string(),
+            Literal::String(v) => v.clone(),
+        }
+    }
 }

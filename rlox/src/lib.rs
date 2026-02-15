@@ -1,3 +1,4 @@
+mod expr;
 mod token;
 
 use std::{io::Write, path::Path};
