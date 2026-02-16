@@ -1,9 +1,14 @@
 mod expr;
+mod parser;
 mod token;
 
 use std::{io::Write, path::Path};
 
-use crate::token::Scanner;
+use crate::{
+    expr::AstPrinter,
+    parser::Parser,
+    token::{Scanner, Token, TokenType},
+};
 
 #[derive(Default)]
 pub struct Lox {
@@ -38,33 +43,38 @@ impl Lox {
     }
 
     fn run(&mut self, source: String) {
-        let mut scanner = Scanner::new(
-            source,
-            Box::new(|line, message| {
-                self.error(line, message);
-            }),
-        );
+        let (tokens, scan_errors) = Scanner::new(source).scan_tokens();
+        for error in scan_errors {
+            self.report(error.line, "", &error.message);
+        }
 
-        let tokens = scanner.scan_tokens();
-        for token in tokens {
-            println!("{token}");
+        for token in &tokens {
+            println!("{}", token);
+        }
+
+        let expression = Parser::new(&tokens).parse();
+        match expression {
+            Ok(expr) => println!("{}", AstPrinter.print(&expr)),
+            Err(parse_error) => self.error(&tokens[parse_error.token_index], &parse_error.message),
         }
     }
 
-    pub fn error(&mut self, line: usize, message: &str) {
-        self.report(line, "", message);
+    pub fn error(&mut self, token: &Token, message: &str) {
+        if token.token_type == TokenType::Eof {
+            self.report(token.line, " at end", message);
+        } else {
+            self.report(token.line, &format!(" at '{}'", token.lexeme), message);
+        }
     }
 
     fn report(&mut self, line: usize, place: &str, message: &str) {
-        eprintln!("[line {line}] Error {place}: {message}");
+        eprintln!("[line {line}] Error{place}: {message}");
         self.had_error = true;
     }
 }
 
 fn read_line() -> String {
     let mut read_line = String::new();
-    std::io::stdin()
-        .read_line(&mut read_line)
-        .expect("read line");
+    std::io::stdin().read_line(&mut read_line).expect("read line");
     read_line
 }

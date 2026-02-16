@@ -25,7 +25,7 @@ impl RpnPrinter {
 
 impl Visitor<String> for RpnPrinter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> String {
-        self.post_orderize(operator.lexeme(), &[left, right])
+        self.post_orderize(&operator.lexeme, &[left, right])
     }
 
     fn visit_grouping(&mut self, expression: &Expr) -> String {
@@ -37,6 +37,6 @@ impl Visitor<String> for RpnPrinter {
     }
 
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> String {
-        self.post_orderize(operator.lexeme(), &[right])
+        self.post_orderize(&operator.lexeme, &[right])
     }
 }

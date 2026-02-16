@@ -1,43 +1,51 @@
 use std::fmt::Display;
 
-pub struct Scanner<'a> {
+pub struct Scanner {
     source: Vec<u8>,
-    tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
-    err_fn: ErrorHandler<'a>,
+
+    tokens: Vec<Token>,
+    errors: Vec<ScanError>,
 }
 
-type ErrorHandler<'a> = Box<dyn FnMut(usize, &str) + 'a>;
+pub struct ScanError {
+    pub line: usize,
+    pub message: String,
+}
 
-impl<'a> Scanner<'a> {
+impl Scanner {
     fn error(&mut self, line: usize, message: &str) {
-        (self.err_fn)(line, message);
+        self.errors.push(ScanError {
+            line,
+            message: message.to_string(),
+        });
     }
 
-    pub fn new(source: String, err_fn: ErrorHandler<'a>) -> Self {
+    pub fn new(source: String) -> Self {
         Self {
             source: source.as_bytes().to_owned(),
-            tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
-            err_fn,
+            tokens: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
-    pub fn scan_tokens(&mut self) -> &Vec<Token> {
+    /// Consumes scanner and returns created tokens and any accompanying errors
+    pub fn scan_tokens(mut self) -> (Vec<Token>, Vec<ScanError>) {
         while !self.is_at_end() {
             // We are at the beginning of the next lexeme.
             self.start = self.current;
             self.scan_token();
         }
 
-        let end_of_file = Token::new(TokenType::Eof, "".into(), None, self.line);
-        self.tokens.push(end_of_file);
+        // End of file token
+        self.tokens.push(Token::new(TokenType::Eof, "".into(), None, self.line));
 
-        &self.tokens
+        (self.tokens, self.errors)
     }
 
     fn scan_token(&mut self) {
@@ -125,7 +133,14 @@ impl<'a> Scanner<'a> {
 
         let bytes = &self.source[self.start..self.current];
         let text = unsafe { str::from_utf8_unchecked(bytes) };
-        self.add_token(try_keyword(text).unwrap_or(TokenType::Identifier));
+        let token_type = try_keyword(text).unwrap_or(TokenType::Identifier);
+
+        match token_type {
+            TokenType::True => self.add_token_literal(TokenType::True, Some(Literal::Boolean(true))),
+            TokenType::False => self.add_token_literal(TokenType::False, Some(Literal::Boolean(false))),
+            TokenType::Nil => self.add_token_literal(TokenType::Nil, Some(Literal::Nil)),
+            t => self.add_token(t),
+        }
     }
 
     fn number(&mut self) {
@@ -142,9 +157,7 @@ impl<'a> Scanner<'a> {
         }
 
         let bytes = &self.source[self.start..self.current];
-        let number = unsafe { str::from_utf8_unchecked(bytes) }
-            .parse()
-            .expect("Parse f64");
+        let number = unsafe { str::from_utf8_unchecked(bytes) }.parse().expect("Parse f64");
 
         self.add_token_literal(TokenType::Number, Some(Literal::Number(number)));
     }
@@ -228,31 +241,22 @@ fn is_alpha_numeric(c: char) -> bool {
     is_alpha(c) || c.is_ascii_digit()
 }
 
+#[derive(Clone)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    literal: Option<Literal>,
-    line: usize,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub literal: Option<Literal>,
+    pub line: usize,
 }
 
 impl Token {
-    pub fn new(
-        token_type: TokenType,
-        lexeme: String,
-        literal: Option<Literal>,
-        line: usize,
-    ) -> Self {
+    pub fn new(token_type: TokenType, lexeme: String, literal: Option<Literal>, line: usize) -> Self {
         Self {
             token_type,
             lexeme,
             literal,
             line,
         }
-    }
-
-    #[inline(always)]
-    pub fn lexeme(&self) -> &String {
-        &self.lexeme
     }
 }
 
@@ -287,7 +291,7 @@ fn try_keyword(keyword_str: &str) -> Option<TokenType> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TokenType {
     // Single character
     LeftParen,
@@ -339,10 +343,12 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Number(f64),
     String(String),
+    Boolean(bool),
+    Nil,
 }
 
 impl Literal {
@@ -350,6 +356,8 @@ impl Literal {
         match self {
             Literal::Number(v) => v.to_string(),
             Literal::String(v) => v.clone(),
+            Literal::Boolean(v) => v.to_string(),
+            Literal::Nil => "nil".to_string(),
         }
     }
 }

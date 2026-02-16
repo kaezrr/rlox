@@ -1,6 +1,9 @@
 mod ast_printer;
 mod rpn_printer;
 
+pub use ast_printer::AstPrinter;
+pub use rpn_printer::RpnPrinter;
+
 use crate::token::{self, Token};
 
 pub enum Expr {
@@ -8,6 +11,24 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(token::Literal),
     Unary(Token, Box<Expr>),
+}
+
+impl Expr {
+    pub fn binary(left: Expr, operator: Token, right: Expr) -> Expr {
+        Expr::Binary(Box::new(left), operator, Box::new(right))
+    }
+
+    pub fn unary(operator: Token, right: Expr) -> Expr {
+        Expr::Unary(operator, Box::new(right))
+    }
+
+    pub fn literal(literal: token::Literal) -> Expr {
+        Expr::Literal(literal)
+    }
+
+    pub fn grouping(expr: Expr) -> Expr {
+        Expr::Grouping(Box::new(expr))
+    }
 }
 
 trait Visitor<R> {

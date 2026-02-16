@@ -27,7 +27,7 @@ impl AstPrinter {
 
 impl Visitor<String> for AstPrinter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> String {
-        self.parenthesize(operator.lexeme(), &[left, right])
+        self.parenthesize(&operator.lexeme, &[left, right])
     }
 
     fn visit_grouping(&mut self, expression: &Expr) -> String {
@@ -39,6 +39,6 @@ impl Visitor<String> for AstPrinter {
     }
 
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> String {
-        self.parenthesize(operator.lexeme(), &[right])
+        self.parenthesize(&operator.lexeme, &[right])
     }
 }
