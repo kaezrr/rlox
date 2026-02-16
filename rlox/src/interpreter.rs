@@ -62,25 +62,41 @@ impl Visitor<EvalResult> for Interpreter {
                 )),
             },
 
-            TokenType::Greater => {
-                let (left, right) = check_number_operands(operator, &left, &right)?;
-                Ok(Literal::Boolean(left > right))
-            }
+            TokenType::Greater => match (left, right) {
+                (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Boolean(left > right)),
+                (Literal::String(left), Literal::String(right)) => Ok(Literal::Boolean(left > right)),
+                _ => Err(RuntimeError::new(
+                    operator,
+                    "Operands must be two numbers or two strings.",
+                )),
+            },
 
-            TokenType::GreaterEqual => {
-                let (left, right) = check_number_operands(operator, &left, &right)?;
-                Ok(Literal::Boolean(left >= right))
-            }
+            TokenType::GreaterEqual => match (left, right) {
+                (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Boolean(left >= right)),
+                (Literal::String(left), Literal::String(right)) => Ok(Literal::Boolean(left >= right)),
+                _ => Err(RuntimeError::new(
+                    operator,
+                    "Operands must be two numbers or two strings.",
+                )),
+            },
 
-            TokenType::Less => {
-                let (left, right) = check_number_operands(operator, &left, &right)?;
-                Ok(Literal::Boolean(left < right))
-            }
+            TokenType::Less => match (left, right) {
+                (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Boolean(left < right)),
+                (Literal::String(left), Literal::String(right)) => Ok(Literal::Boolean(left < right)),
+                _ => Err(RuntimeError::new(
+                    operator,
+                    "Operands must be two numbers or two strings.",
+                )),
+            },
 
-            TokenType::LessEqual => {
-                let (left, right) = check_number_operands(operator, &left, &right)?;
-                Ok(Literal::Boolean(left <= right))
-            }
+            TokenType::LessEqual => match (left, right) {
+                (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Boolean(left <= right)),
+                (Literal::String(left), Literal::String(right)) => Ok(Literal::Boolean(left <= right)),
+                _ => Err(RuntimeError::new(
+                    operator,
+                    "Operands must be two numbers or two strings.",
+                )),
+            },
 
             TokenType::BangEqual => Ok(Literal::Boolean(left.is_truthy() != left.is_truthy())),
 
