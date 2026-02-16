@@ -41,4 +41,8 @@ impl Visitor<String> for AstPrinter {
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> String {
         self.parenthesize(&operator.lexeme, &[right])
     }
+
+    fn visit_comma(&mut self, left: &Expr, right: &Expr) -> String {
+        self.parenthesize(",", &[left, right])
+    }
 }

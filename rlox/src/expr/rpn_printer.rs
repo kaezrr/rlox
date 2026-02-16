@@ -39,4 +39,8 @@ impl Visitor<String> for RpnPrinter {
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> String {
         self.post_orderize(&operator.lexeme, &[right])
     }
+
+    fn visit_comma(&mut self, left: &Expr, right: &Expr) -> String {
+        self.post_orderize(",", &[left, right])
+    }
 }

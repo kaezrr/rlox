@@ -48,10 +48,6 @@ impl Lox {
             self.report(error.line, "", &error.message);
         }
 
-        for token in &tokens {
-            println!("{}", token);
-        }
-
         let expression = Parser::new(&tokens).parse();
         match expression {
             Ok(expr) => println!("{}", AstPrinter.print(&expr)),

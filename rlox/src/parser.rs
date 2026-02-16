@@ -30,10 +30,24 @@ impl<'a> Parser<'a> {
         self.expression()
     }
 
+    /// expression -> comma
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.equality()
+        self.comma()
     }
 
+    /// comma -> equality ("," equality)*
+    fn comma(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.equality()?;
+
+        while self.advance_if(&[TokenType::Comma]) {
+            let right = self.equality()?;
+            expr = Expr::comma(expr, right);
+        }
+
+        Ok(expr)
+    }
+
+    /// equality -> comparison (("==" | "!=") comparison)*
     fn equality(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.comparison()?;
 
@@ -48,6 +62,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    /// comparison -> term (("> | ">=" | "<" | "<=") term)*
     fn comparison(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.term()?;
 
@@ -67,6 +82,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    /// term -> factor (("-" | "+") factor)*
     fn term(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.factor()?;
 
@@ -81,6 +97,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    /// factor -> unary (("/" | "*") unary)*
     fn factor(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.unary()?;
 
@@ -95,6 +112,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    /// unary -> ("!" | "-") unary | primary
     fn unary(&mut self) -> Result<Expr, ParseError> {
         let next_tokens_to_match = [TokenType::Bang, TokenType::Minus];
 
@@ -107,6 +125,7 @@ impl<'a> Parser<'a> {
         self.primary()
     }
 
+    /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")"
     fn primary(&mut self) -> Result<Expr, ParseError> {
         // Literals
         let next_tokens_to_match = [
