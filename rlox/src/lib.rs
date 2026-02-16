@@ -7,8 +7,8 @@ use std::{io::Write, path::Path};
 
 use crate::{
     interpreter::{Interpreter, RuntimeError},
-    parser::Parser,
-    token::{Scanner, Token, TokenType},
+    parser::{ParseError, Parser},
+    token::{Scanner, TokenType},
 };
 
 #[derive(Default)]
@@ -58,26 +58,27 @@ impl Lox {
 
         let expression = match Parser::new(&tokens).parse() {
             Ok(expr) => expr,
-            Err(e) => return self.error(&tokens[e.token_index], &e.message),
+            Err(e) => return self.report_parse_error(e),
         };
 
         let value = match self.interpreter.interpret(&expression) {
             Ok(v) => v,
-            Err(e) => return self.runtime_error(e),
+            Err(e) => return self.report_runtime_error(e),
         };
 
         eprintln!("{}", value);
     }
 
-    fn error(&mut self, token: &Token, message: &str) {
+    fn report_parse_error(&mut self, err: ParseError) {
+        let token = err.token;
         if token.token_type == TokenType::Eof {
-            self.report(token.line, " at end", message);
+            self.report(token.line, " at end", &err.message);
         } else {
-            self.report(token.line, &format!(" at '{}'", token.lexeme), message);
+            self.report(token.line, &format!(" at '{}'", token.lexeme), &err.message);
         }
     }
 
-    fn runtime_error(&mut self, err: RuntimeError) {
+    fn report_runtime_error(&mut self, err: RuntimeError) {
         eprintln!("{}\n[line {}]", err.message, err.token.line);
         self.had_runtime_error = true;
     }

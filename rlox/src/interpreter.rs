@@ -42,14 +42,17 @@ impl Visitor<EvalResult> for Interpreter {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Number(left - right))
             }
+
             TokenType::Slash => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Number(left / right))
             }
+
             TokenType::Star => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Number(left * right))
             }
+
             TokenType::Plus => match (left, right) {
                 (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Number(left + right)),
                 (Literal::String(left), Literal::String(right)) => Ok(Literal::String(left + &right)),
@@ -58,26 +61,30 @@ impl Visitor<EvalResult> for Interpreter {
                     "Operands must be two numbers or two strings.",
                 )),
             },
+
             TokenType::Greater => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Boolean(left > right))
             }
+
             TokenType::GreaterEqual => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Boolean(left >= right))
             }
+
             TokenType::Less => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Boolean(left < right))
             }
+
             TokenType::LessEqual => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
                 Ok(Literal::Boolean(left <= right))
             }
 
-            TokenType::BangEqual => Ok(Literal::Boolean(left != right)),
+            TokenType::BangEqual => Ok(Literal::Boolean(left.is_truthy() != left.is_truthy())),
 
-            TokenType::EqualEqual => Ok(Literal::Boolean(left == right)),
+            TokenType::EqualEqual => Ok(Literal::Boolean(left.is_truthy() == right.is_truthy())),
 
             _ => unreachable!(),
         }

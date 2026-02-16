@@ -5,24 +5,19 @@ use crate::{
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
-    errors: Vec<ParseError>,
     current: usize,
 }
 
 impl<'a> Parser<'a> {
     fn error(&self, err_msg: &str) -> ParseError {
         ParseError {
-            token_index: self.current,
+            token: self.peek().clone(),
             message: err_msg.to_string(),
         }
     }
 
     pub fn new(tokens: &'a [Token]) -> Self {
-        Self {
-            tokens,
-            errors: Vec::new(),
-            current: 0,
-        }
+        Self { tokens, current: 0 }
     }
 
     pub fn parse(mut self) -> Result<Expr, ParseError> {
@@ -38,10 +33,11 @@ impl<'a> Parser<'a> {
     fn comma(&mut self) -> Result<Expr, ParseError> {
         // Missing left operand
         if self.check(&[TokenType::Comma]) {
+            let err = self.error("Expect expression before comma");
             while self.advance_if(&[TokenType::Comma]) {
                 let _ = self.ternary();
             }
-            return Err(self.error("Expect expression before comma"));
+            return Err(err);
         }
 
         let mut expr = self.ternary()?;
@@ -57,10 +53,12 @@ impl<'a> Parser<'a> {
     /// ternary -> (equality "?" ternary ":" ternary) | equality
     fn ternary(&mut self) -> Result<Expr, ParseError> {
         // Missing left operand
-        if self.advance_if(&[TokenType::Question]) {
+        if self.check(&[TokenType::Question]) {
+            let err = self.error("Expect condition in ternary expression");
+            self.advance();
             let _ = self.ternary();
             let _ = self.ternary();
-            return Err(self.error("Expect condition in ternary expression"));
+            return Err(err);
         }
 
         let mut expr = self.equality()?;
@@ -81,10 +79,11 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {
+            let err = self.error("Expect expression before equality");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.comparison();
             }
-            return Err(self.error("Expect expression before equality"));
+            return Err(err);
         }
 
         let mut expr = self.comparison()?;
@@ -109,10 +108,11 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {
+            let err = self.error("Expect expression before comparison");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.term();
             }
-            return Err(self.error("Expect expression before comparison"));
+            return Err(err);
         }
 
         let mut expr = self.term()?;
@@ -132,10 +132,11 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&[TokenType::Plus]) {
+            let err = self.error("Expect expression before binary operator");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.factor();
             }
-            return Err(self.error("Expect expression before binary operator"));
+            return Err(err);
         }
 
         let mut expr = self.factor()?;
@@ -155,10 +156,11 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {
+            let err = self.error("Expect expression before binary operator");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.unary();
             }
-            return Err(self.error("Expect expression before binary operator"));
+            return Err(err);
         }
 
         let mut expr = self.unary()?;
@@ -279,8 +281,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[derive(Debug)]
 pub struct ParseError {
-    pub token_index: usize,
+    pub token: Token,
     pub message: String,
 }
