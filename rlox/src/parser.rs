@@ -36,6 +36,14 @@ impl<'a> Parser<'a> {
 
     /// comma -> equality ("," equality)*
     fn comma(&mut self) -> Result<Expr, ParseError> {
+        // Missing left operand
+        if self.check(&[TokenType::Comma]) {
+            while self.advance_if(&[TokenType::Comma]) {
+                let _ = self.ternary();
+            }
+            return Err(self.error("Expect expression before comma"));
+        }
+
         let mut expr = self.ternary()?;
 
         while self.advance_if(&[TokenType::Comma]) {
@@ -48,11 +56,18 @@ impl<'a> Parser<'a> {
 
     /// ternary -> (equality "?" ternary ":" ternary) | equality
     fn ternary(&mut self) -> Result<Expr, ParseError> {
+        // Missing left operand
+        if self.advance_if(&[TokenType::Question]) {
+            let _ = self.ternary();
+            let _ = self.ternary();
+            return Err(self.error("Expect condition in ternary expression"));
+        }
+
         let mut expr = self.equality()?;
 
         if self.advance_if(&[TokenType::Question]) {
             let left = self.ternary()?;
-            self.consume(TokenType::Colon, "Expected ':' after ternary expression")?;
+            self.consume(TokenType::Colon, "Expect ':' after ternary expression")?;
             let right = self.ternary()?;
             expr = Expr::ternary(expr, left, right);
         }
@@ -62,9 +77,17 @@ impl<'a> Parser<'a> {
 
     /// equality -> comparison (("==" | "!=") comparison)*
     fn equality(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.comparison()?;
-
         let next_tokens_to_match = [TokenType::BangEqual, TokenType::EqualEqual];
+
+        // Missing left operand
+        if self.check(&next_tokens_to_match) {
+            while self.advance_if(&next_tokens_to_match) {
+                let _ = self.comparison();
+            }
+            return Err(self.error("Expect expression before equality"));
+        }
+
+        let mut expr = self.comparison()?;
 
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
@@ -77,14 +100,22 @@ impl<'a> Parser<'a> {
 
     /// comparison -> term (("> | ">=" | "<" | "<=") term)*
     fn comparison(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.term()?;
-
         let next_tokens_to_match = [
             TokenType::Greater,
             TokenType::GreaterEqual,
             TokenType::Less,
             TokenType::LessEqual,
         ];
+
+        // Missing left operand
+        if self.check(&next_tokens_to_match) {
+            while self.advance_if(&next_tokens_to_match) {
+                let _ = self.term();
+            }
+            return Err(self.error("Expect expression before comparison"));
+        }
+
+        let mut expr = self.term()?;
 
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
@@ -97,9 +128,17 @@ impl<'a> Parser<'a> {
 
     /// term -> factor (("-" | "+") factor)*
     fn term(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.factor()?;
-
         let next_tokens_to_match = [TokenType::Minus, TokenType::Plus];
+
+        // Missing left operand
+        if self.check(&[TokenType::Plus]) {
+            while self.advance_if(&next_tokens_to_match) {
+                let _ = self.factor();
+            }
+            return Err(self.error("Expect expression before binary operator"));
+        }
+
+        let mut expr = self.factor()?;
 
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
@@ -112,9 +151,17 @@ impl<'a> Parser<'a> {
 
     /// factor -> unary (("/" | "*") unary)*
     fn factor(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.unary()?;
-
         let next_tokens_to_match = [TokenType::Slash, TokenType::Star];
+
+        // Missing left operand
+        if self.check(&next_tokens_to_match) {
+            while self.advance_if(&next_tokens_to_match) {
+                let _ = self.unary();
+            }
+            return Err(self.error("Expect expression before binary operator"));
+        }
+
+        let mut expr = self.unary()?;
 
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
@@ -189,22 +236,20 @@ impl<'a> Parser<'a> {
 
     /// Consume a given token or return error if it doesn't exist
     fn consume(&mut self, token_type: TokenType, err_msg: &str) -> Result<&Token, ParseError> {
-        if self.check(token_type) {
+        if self.check(&[token_type]) {
             return Ok(self.advance());
         }
 
         Err(self.error(err_msg))
     }
 
-    fn advance_if(&mut self, token_types: &[TokenType]) -> bool {
-        for &token_type in token_types {
-            if self.check(token_type) {
-                self.advance();
-                return true;
-            }
+    fn advance_if(&mut self, types: &[TokenType]) -> bool {
+        if !self.check(types) {
+            return false;
         }
 
-        false
+        self.advance();
+        true
     }
 
     fn advance(&mut self) -> &Token {
@@ -222,11 +267,11 @@ impl<'a> Parser<'a> {
         &self.tokens[self.current - 1]
     }
 
-    fn check(&self, token_type: TokenType) -> bool {
+    fn check(&self, types: &[TokenType]) -> bool {
         if self.is_at_end() {
             return false;
         }
-        self.peek().token_type == token_type
+        types.iter().any(|t| self.peek().token_type == *t)
     }
 
     fn is_at_end(&self) -> bool {
