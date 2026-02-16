@@ -355,13 +355,24 @@ pub enum Literal {
     Nil,
 }
 
-impl Literal {
-    pub fn value(&self) -> String {
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Number(v) => v.to_string(),
-            Literal::String(v) => v.clone(),
-            Literal::Boolean(v) => v.to_string(),
-            Literal::Nil => "nil".to_string(),
+            Literal::Number(v) => write!(f, "{}", v),
+            Literal::String(v) => write!(f, "\"{}\"", v),
+            Literal::Boolean(v) => write!(f, "{}", v),
+            Literal::Nil => write!(f, "nil"),
+        }
+    }
+}
+
+impl Literal {
+    /// Lox follows Ruby’s simple rule: false and nil are falsey, and everything else is truthy.
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Literal::Nil => false,
+            Literal::Boolean(v) => *v,
+            _ => true,
         }
     }
 }

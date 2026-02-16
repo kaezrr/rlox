@@ -33,7 +33,7 @@ impl Visitor<String> for RpnPrinter {
     }
 
     fn visit_literal(&mut self, literal: &token::Literal) -> String {
-        literal.value()
+        literal.to_string()
     }
 
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> String {

@@ -40,7 +40,7 @@ impl Expr {
     }
 }
 
-trait Visitor<R> {
+pub trait Visitor<R> {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> R;
     fn visit_grouping(&mut self, expression: &Expr) -> R;
     fn visit_literal(&mut self, literal: &token::Literal) -> R;
@@ -50,7 +50,7 @@ trait Visitor<R> {
 }
 
 impl Expr {
-    fn accept<R, V: Visitor<R>>(&self, visitor: &mut V) -> R {
+    pub fn accept<R, V: Visitor<R>>(&self, visitor: &mut V) -> R {
         match self {
             Expr::Grouping(expression) => visitor.visit_grouping(expression),
             Expr::Literal(literal) => visitor.visit_literal(literal),

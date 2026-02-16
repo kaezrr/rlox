@@ -1,18 +1,22 @@
 mod expr;
+mod interpreter;
 mod parser;
 mod token;
 
 use std::{io::Write, path::Path};
 
 use crate::{
-    expr::AstPrinter,
+    interpreter::{Interpreter, RuntimeError},
     parser::Parser,
     token::{Scanner, Token, TokenType},
 };
 
 #[derive(Default)]
 pub struct Lox {
+    interpreter: Interpreter,
+
     had_error: bool,
+    had_runtime_error: bool,
 }
 
 impl Lox {
@@ -23,6 +27,10 @@ impl Lox {
 
         if self.had_error {
             std::process::exit(65);
+        }
+
+        if self.had_runtime_error {
+            std::process::exit(70);
         }
     }
 
@@ -48,19 +56,30 @@ impl Lox {
             self.report(error.line, "", &error.message);
         }
 
-        let expression = Parser::new(&tokens).parse();
-        match expression {
-            Ok(expr) => println!("{}", AstPrinter.print(&expr)),
-            Err(parse_error) => self.error(&tokens[parse_error.token_index], &parse_error.message),
-        }
+        let expression = match Parser::new(&tokens).parse() {
+            Ok(expr) => expr,
+            Err(e) => return self.error(&tokens[e.token_index], &e.message),
+        };
+
+        let value = match self.interpreter.interpret(&expression) {
+            Ok(v) => v,
+            Err(e) => return self.runtime_error(e),
+        };
+
+        eprintln!("{}", value);
     }
 
-    pub fn error(&mut self, token: &Token, message: &str) {
+    fn error(&mut self, token: &Token, message: &str) {
         if token.token_type == TokenType::Eof {
             self.report(token.line, " at end", message);
         } else {
             self.report(token.line, &format!(" at '{}'", token.lexeme), message);
         }
+    }
+
+    fn runtime_error(&mut self, err: RuntimeError) {
+        eprintln!("{}\n[line {}]", err.message, err.token.line);
+        self.had_runtime_error = true;
     }
 
     fn report(&mut self, line: usize, place: &str, message: &str) {
