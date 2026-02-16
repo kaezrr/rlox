@@ -112,11 +112,18 @@ impl Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_comma(&mut self, left: &Expr, right: &Expr) -> EvalResult {
-        todo!()
+        let _ = self.evaluate(left)?;
+        self.evaluate(right)
     }
 
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> EvalResult {
-        todo!()
+        let condition = self.evaluate(cond)?.is_truthy();
+
+        if condition {
+            self.evaluate(left)
+        } else {
+            self.evaluate(right)
+        }
     }
 }
 
