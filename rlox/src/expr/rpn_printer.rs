@@ -43,4 +43,8 @@ impl Visitor<String> for RpnPrinter {
     fn visit_comma(&mut self, left: &Expr, right: &Expr) -> String {
         self.post_orderize(",", &[left, right])
     }
+
+    fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> String {
+        self.post_orderize("?:", &[cond, left, right])
+    }
 }

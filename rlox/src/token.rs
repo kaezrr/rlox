@@ -68,6 +68,8 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
+            '?' => self.add_token(TokenType::Question),
+            ':' => self.add_token(TokenType::Colon),
 
             '=' => two_char!('=', TokenType::EqualEqual, TokenType::Equal),
             '!' => two_char!('=', TokenType::BangEqual, TokenType::Bang),
@@ -305,6 +307,8 @@ pub enum TokenType {
     Semicolon,
     Slash,
     Star,
+    Question,
+    Colon,
 
     // One or two characters
     Bang,
