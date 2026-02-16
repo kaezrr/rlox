@@ -45,6 +45,11 @@ impl Visitor<EvalResult> for Interpreter {
 
             TokenType::Slash => {
                 let (left, right) = check_number_operands(operator, &left, &right)?;
+
+                if !right.is_normal() {
+                    return Err(RuntimeError::new(operator, "Division by zero."));
+                }
+
                 Ok(Literal::Number(left / right))
             }
 
@@ -56,10 +61,9 @@ impl Visitor<EvalResult> for Interpreter {
             TokenType::Plus => match (left, right) {
                 (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Number(left + right)),
                 (Literal::String(left), Literal::String(right)) => Ok(Literal::String(left + &right)),
-                _ => Err(RuntimeError::new(
-                    operator,
-                    "Operands must be two numbers or two strings.",
-                )),
+                (Literal::String(left), Literal::Number(right)) => Ok(Literal::String(left + &right.to_string())),
+                (Literal::Number(left), Literal::String(right)) => Ok(Literal::String(left.to_string() + &right)),
+                _ => Err(RuntimeError::new(operator, "Operands must be numbers or strings.")),
             },
 
             TokenType::Greater => match (left, right) {
@@ -98,7 +102,7 @@ impl Visitor<EvalResult> for Interpreter {
                 )),
             },
 
-            TokenType::BangEqual => Ok(Literal::Boolean(left.is_truthy() != left.is_truthy())),
+            TokenType::BangEqual => Ok(Literal::Boolean(left.is_truthy() != right.is_truthy())),
 
             TokenType::EqualEqual => Ok(Literal::Boolean(left.is_truthy() == right.is_truthy())),
 
