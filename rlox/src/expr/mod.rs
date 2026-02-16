@@ -34,6 +34,10 @@ impl Expr {
     pub fn comma(left: Expr, right: Expr) -> Expr {
         Expr::Comma(Box::new(left), Box::new(right))
     }
+
+    pub fn ternary(cond: Expr, left: Expr, right: Expr) -> Expr {
+        Expr::Ternary(Box::new(cond), Box::new(left), Box::new(right))
+    }
 }
 
 trait Visitor<R> {

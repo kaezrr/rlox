@@ -10,7 +10,6 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    // TODO: make this store a token
     fn error(&self, err_msg: &str) -> ParseError {
         ParseError {
             token_index: self.current,
@@ -37,11 +36,25 @@ impl<'a> Parser<'a> {
 
     /// comma -> equality ("," equality)*
     fn comma(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.equality()?;
+        let mut expr = self.ternary()?;
 
         while self.advance_if(&[TokenType::Comma]) {
-            let right = self.equality()?;
+            let right = self.ternary()?;
             expr = Expr::comma(expr, right);
+        }
+
+        Ok(expr)
+    }
+
+    /// ternary -> (equality "?" ternary ":" ternary) | equality
+    fn ternary(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.equality()?;
+
+        if self.advance_if(&[TokenType::Question]) {
+            let left = self.ternary()?;
+            self.consume(TokenType::Colon, "Expected ':' after ternary expression")?;
+            let right = self.ternary()?;
+            expr = Expr::ternary(expr, left, right);
         }
 
         Ok(expr)
@@ -174,6 +187,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Consume a given token or return error if it doesn't exist
     fn consume(&mut self, token_type: TokenType, err_msg: &str) -> Result<&Token, ParseError> {
         if self.check(token_type) {
             return Ok(self.advance());
