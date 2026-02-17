@@ -28,6 +28,29 @@ impl AstPrinter {
     }
 }
 
+#[allow(unused)]
+pub struct RpnPrinter;
+
+#[allow(unused)]
+impl RpnPrinter {
+    /// Prints the Reverse Polish Notation of a given expression
+    pub fn print(&mut self, expr: &Expr) -> String {
+        expr.accept(self)
+    }
+
+    fn post_orderize(&mut self, op: &str, exprs: &[&Expr]) -> String {
+        let mut builder = String::new();
+
+        for expr in exprs {
+            builder.push_str(&expr.accept(self));
+            builder.push(' ');
+        }
+
+        builder.push_str(op);
+        builder
+    }
+}
+
 impl expr::Visitor<String> for AstPrinter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> String {
         self.parenthesize(&operator.lexeme, &[left, right])
@@ -56,28 +79,9 @@ impl expr::Visitor<String> for AstPrinter {
     fn visit_variable(&mut self, name: &Token) -> String {
         name.lexeme.clone()
     }
-}
 
-#[allow(unused)]
-pub struct RpnPrinter;
-
-#[allow(unused)]
-impl RpnPrinter {
-    /// Prints the Reverse Polish Notation of a given expression
-    pub fn print(&mut self, expr: &Expr) -> String {
-        expr.accept(self)
-    }
-
-    fn post_orderize(&mut self, op: &str, exprs: &[&Expr]) -> String {
-        let mut builder = String::new();
-
-        for expr in exprs {
-            builder.push_str(&expr.accept(self));
-            builder.push(' ');
-        }
-
-        builder.push_str(op);
-        builder
+    fn visit_assign(&mut self, name: &Token, value: &Expr) -> String {
+        self.parenthesize(&format!("= {}", name.lexeme), &[value])
     }
 }
 
@@ -108,5 +112,9 @@ impl expr::Visitor<String> for RpnPrinter {
 
     fn visit_variable(&mut self, name: &Token) -> String {
         name.lexeme.clone()
+    }
+
+    fn visit_assign(&mut self, name: &Token, value: &Expr) -> String {
+        self.post_orderize(&format!("= {}", name.lexeme), &[value])
     }
 }

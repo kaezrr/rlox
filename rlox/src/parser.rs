@@ -11,9 +11,9 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn error(&self, err_msg: &str) -> ParseError {
+    fn error(&self, token: Token, err_msg: &str) -> ParseError {
         ParseError {
-            token: self.peek().clone(),
+            token,
             message: err_msg.to_string(),
         }
     }
@@ -95,14 +95,32 @@ impl<'a> Parser<'a> {
 
     /// expression -> comma
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.comma()
+        self.assignment()
     }
 
-    /// comma -> equality ("," equality)*
+    /// assignment -> IDENTIFIER "=" assignment | comma
+    fn assignment(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.comma()?;
+
+        if self.advance_if(&[TokenType::Equal]) {
+            let equals = self.previous().clone();
+            let value = self.assignment()?;
+
+            if let Expr::Variable(name) = expr {
+                return Ok(Expr::assign(name, value));
+            }
+
+            return Err(self.error(equals, "Invalid assignment target"));
+        }
+
+        Ok(expr)
+    }
+
+    /// comma -> ternary ("," ternary)*
     fn comma(&mut self) -> Result<Expr, ParseError> {
         // Missing left operand
         if self.check(&[TokenType::Comma]) {
-            let err = self.error("Expect expression before comma");
+            let err = self.error(self.peek().clone(), "Expect expression before comma");
             while self.advance_if(&[TokenType::Comma]) {
                 let _ = self.ternary();
             }
@@ -123,7 +141,7 @@ impl<'a> Parser<'a> {
     fn ternary(&mut self) -> Result<Expr, ParseError> {
         // Missing left operand
         if self.check(&[TokenType::Question]) {
-            let err = self.error("Expect condition in ternary expression");
+            let err = self.error(self.peek().clone(), "Expect condition in ternary expression");
             self.advance();
             let _ = self.ternary();
             let _ = self.ternary();
@@ -148,7 +166,7 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {
-            let err = self.error("Expect expression before equality");
+            let err = self.error(self.peek().clone(), "Expect expression before equality");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.comparison();
             }
@@ -177,7 +195,7 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {
-            let err = self.error("Expect expression before comparison");
+            let err = self.error(self.peek().clone(), "Expect expression before comparison");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.term();
             }
@@ -201,7 +219,7 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&[TokenType::Plus]) {
-            let err = self.error("Expect expression before binary operator");
+            let err = self.error(self.peek().clone(), "Expect expression before binary operator");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.factor();
             }
@@ -225,7 +243,7 @@ impl<'a> Parser<'a> {
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {
-            let err = self.error("Expect expression before binary operator");
+            let err = self.error(self.peek().clone(), "Expect expression before binary operator");
             while self.advance_if(&next_tokens_to_match) {
                 let _ = self.unary();
             }
@@ -282,7 +300,7 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Variable(self.previous().clone()));
         }
 
-        Err(self.error("Expect expression."))
+        Err(self.error(self.peek().clone(), "Expect expression."))
     }
 
     fn synchronize(&mut self) {
@@ -315,7 +333,7 @@ impl<'a> Parser<'a> {
             return Ok(self.advance());
         }
 
-        Err(self.error(err_msg))
+        Err(self.error(self.peek().clone(), err_msg))
     }
 
     fn advance_if(&mut self, types: &[TokenType]) -> bool {

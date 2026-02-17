@@ -8,6 +8,7 @@ pub enum Expr {
     Comma(Box<Expr>, Box<Expr>),
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
     Variable(Token),
+    Assign(Token, Box<Expr>),
 }
 
 impl Expr {
@@ -34,6 +35,10 @@ impl Expr {
     pub fn ternary(cond: Expr, left: Expr, right: Expr) -> Expr {
         Expr::Ternary(Box::new(cond), Box::new(left), Box::new(right))
     }
+
+    pub fn assign(name: Token, value: Expr) -> Expr {
+        Expr::Assign(name, Box::new(value))
+    }
 }
 
 pub trait Visitor<R> {
@@ -44,6 +49,7 @@ pub trait Visitor<R> {
     fn visit_comma(&mut self, left: &Expr, right: &Expr) -> R;
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> R;
     fn visit_variable(&mut self, name: &Token) -> R;
+    fn visit_assign(&mut self, name: &Token, value: &Expr) -> R;
 }
 
 impl Expr {
@@ -56,6 +62,7 @@ impl Expr {
             Expr::Binary(left, operator, right) => visitor.visit_binary(left, operator, right),
             Expr::Ternary(cond, left, right) => visitor.visit_ternary(cond, left, right),
             Expr::Variable(name) => visitor.visit_variable(name),
+            Expr::Assign(name, value) => visitor.visit_assign(name, value),
         }
     }
 }

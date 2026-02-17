@@ -1,11 +1,14 @@
 use crate::{
+    environment::Environment,
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
 };
 
 #[derive(Default)]
-pub struct Interpreter;
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
     pub fn interpret(&mut self, statements: Vec<Stmt>) -> ExecResult {
@@ -30,7 +33,7 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    fn new(token: &Token, err_msg: &str) -> Self {
+    pub fn new(token: &Token, err_msg: &str) -> Self {
         Self {
             token: token.clone(),
             message: err_msg.to_string(),
@@ -156,7 +159,12 @@ impl expr::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_variable(&mut self, name: &Token) -> EvalResult {
-        todo!()
+        self.environment.get(name)
+    }
+
+    fn visit_assign(&mut self, name: &Token, value: &Expr) -> EvalResult {
+        let value = self.evaluate(value)?;
+        self.environment.assign(name, value)
     }
 }
 
@@ -191,6 +199,12 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_var_stmt(&mut self, name: &Token, initializer: &Expr) -> ExecResult {
-        todo!()
+        let mut value = Literal::Nil;
+
+        if !matches!(initializer, Expr::Literal(Literal::Nil)) {
+            value = self.evaluate(initializer)?;
+        }
+        self.environment.define(name.lexeme.clone(), value);
+        Ok(())
     }
 }
