@@ -5,53 +5,56 @@ use crate::{
     token::{Literal, Token},
 };
 
-#[derive(Default)]
-pub struct Environment {
-    values: HashMap<String, Literal>,
-    enclosing: Option<Box<Environment>>,
+type ScopeData = HashMap<String, Literal>;
+
+pub struct Scope {
+    environments: Vec<ScopeData>,
 }
 
-impl Environment {
-    pub fn put_enclosing(&mut self, env: Environment) {
-        self.enclosing = Some(Box::new(env));
+impl Default for Scope {
+    fn default() -> Self {
+        Self {
+            environments: vec![ScopeData::default()],
+        }
+    }
+}
+
+impl Scope {
+    pub fn push(&mut self) {
+        self.environments.push(ScopeData::default());
     }
 
-    pub fn take_enclosing(&mut self) -> Option<Box<Environment>> {
-        self.enclosing.take()
+    pub fn pop(&mut self) {
+        debug_assert!(self.environments.len() > 1, "attempted to pop global scope");
+        self.environments.pop();
     }
 
     pub fn define(&mut self, name: String, value: Literal) {
-        self.values.insert(name, value);
+        self.environments.last_mut().unwrap().insert(name, value);
     }
 
     pub fn get(&self, name: &Token) -> Result<Literal, RuntimeError> {
-        if let Some(value) = self.values.get(&name.lexeme) {
-            return Ok(value.clone());
+        for env in self.environments.iter().rev() {
+            if let Some(value) = env.get(&name.lexeme) {
+                return Ok(value.clone());
+            }
         }
 
-        if let Some(enclosing) = self.enclosing.as_ref() {
-            return enclosing.get(name);
-        }
-
-        Err(RuntimeError::new(
-            name,
-            &format!("Undefined variable '{}'.", name.lexeme),
-        ))
+        Err(undefined_error(name))
     }
 
     pub fn assign(&mut self, name: &Token, value: Literal) -> Result<Literal, RuntimeError> {
-        if self.values.contains_key(&name.lexeme) {
-            self.values.insert(name.lexeme.clone(), value.clone());
-            return Ok(value);
+        for env in self.environments.iter_mut().rev() {
+            if let Some(slot) = env.get_mut(&name.lexeme) {
+                *slot = value.clone();
+                return Ok(value);
+            }
         }
 
-        if let Some(enclosing) = self.enclosing.as_mut() {
-            return enclosing.assign(name, value);
-        }
-
-        Err(RuntimeError::new(
-            name,
-            &format!("Undefined variable '{}'.", name.lexeme),
-        ))
+        Err(undefined_error(name))
     }
+}
+
+fn undefined_error(name: &Token) -> RuntimeError {
+    RuntimeError::new(name, &format!("Undefined variable '{}'.", name.lexeme))
 }

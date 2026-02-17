@@ -1,7 +1,5 @@
-use std::hint::unreachable_unchecked;
-
 use crate::{
-    environment::Environment,
+    environment::Scope,
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
@@ -9,7 +7,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct Interpreter {
-    environment: Environment,
+    scope: Scope,
 }
 
 impl Interpreter {
@@ -24,18 +22,12 @@ impl Interpreter {
         stmt.accept(self)
     }
 
-    fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> ExecResult {
-        let previous = std::mem::replace(&mut self.environment, environment);
-
-        self.environment.put_enclosing(previous);
+    fn execute_block(&mut self, statements: &[Stmt]) -> ExecResult {
+        self.scope.push();
 
         let result = statements.iter().try_for_each(|s| self.execute(s));
 
-        if let Some(previous) = self.environment.take_enclosing() {
-            self.environment = *previous;
-        } else {
-            unreachable!("Previous scope magically disappeared lol.")
-        };
+        self.scope.pop();
 
         result
     }
@@ -177,12 +169,12 @@ impl expr::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_variable(&mut self, name: &Token) -> EvalResult {
-        self.environment.get(name)
+        self.scope.get(name)
     }
 
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> EvalResult {
         let value = self.evaluate(value)?;
-        self.environment.assign(name, value)
+        self.scope.assign(name, value)
     }
 }
 
@@ -222,11 +214,11 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         if !matches!(initializer, Expr::Literal(Literal::Nil)) {
             value = self.evaluate(initializer)?;
         }
-        self.environment.define(name.lexeme.clone(), value);
+        self.scope.define(name.lexeme.clone(), value);
         Ok(())
     }
 
     fn visit_block(&mut self, stmts: &[Stmt]) -> ExecResult {
-        self.execute_block(stmts, Environment::default())
+        self.execute_block(stmts)
     }
 }
