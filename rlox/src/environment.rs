@@ -36,6 +36,9 @@ impl Scope {
     pub fn get(&self, name: &Token) -> Result<Literal, RuntimeError> {
         for env in self.environments.iter().rev() {
             if let Some(value) = env.get(&name.lexeme) {
+                if *value == Literal::Nil {
+                    return Err(uninitialized_error(name));
+                }
                 return Ok(value.clone());
             }
         }
@@ -57,4 +60,8 @@ impl Scope {
 
 fn undefined_error(name: &Token) -> RuntimeError {
     RuntimeError::new(name, &format!("Undefined variable '{}'.", name.lexeme))
+}
+
+fn uninitialized_error(name: &Token) -> RuntimeError {
+    RuntimeError::new(name, &format!("Variable '{}' is not initialized.", name.lexeme))
 }
