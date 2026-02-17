@@ -154,6 +154,10 @@ impl expr::Visitor<EvalResult> for Interpreter {
             self.evaluate(right)
         }
     }
+
+    fn visit_variable(&mut self, name: &Token) -> EvalResult {
+        todo!()
+    }
 }
 
 fn check_number_operand(operator: &Token, operand: &Literal) -> Result<f64, RuntimeError> {
@@ -184,5 +188,9 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     fn visit_expression_stmt(&mut self, expr: &Expr) -> ExecResult {
         self.evaluate(expr)?;
         Ok(())
+    }
+
+    fn visit_var_stmt(&mut self, name: &Token, initializer: &Expr) -> ExecResult {
+        todo!()
     }
 }

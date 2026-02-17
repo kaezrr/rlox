@@ -1,6 +1,8 @@
+mod environment;
 mod expr;
 mod interpreter;
 mod parser;
+mod printers;
 mod stmt;
 mod token;
 
@@ -57,10 +59,10 @@ impl Lox {
             self.report(error.line, "", &error.message);
         }
 
-        let statements = match Parser::new(&tokens).parse() {
-            Ok(expr) => expr,
-            Err(e) => return self.report_parse_error(e),
-        };
+        let (statements, parse_errors) = Parser::new(&tokens).parse();
+        for error in parse_errors {
+            self.report_parse_error(error);
+        }
 
         if let Err(e) = self.interpreter.interpret(statements) {
             self.report_runtime_error(e);

@@ -1,8 +1,3 @@
-mod ast_printer;
-mod rpn_printer;
-
-pub use ast_printer::AstPrinter;
-
 use crate::token::{self, Token};
 
 pub enum Expr {
@@ -12,6 +7,7 @@ pub enum Expr {
     Unary(Token, Box<Expr>),
     Comma(Box<Expr>, Box<Expr>),
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
+    Variable(Token),
 }
 
 impl Expr {
@@ -47,6 +43,7 @@ pub trait Visitor<R> {
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> R;
     fn visit_comma(&mut self, left: &Expr, right: &Expr) -> R;
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> R;
+    fn visit_variable(&mut self, name: &Token) -> R;
 }
 
 impl Expr {
@@ -58,6 +55,7 @@ impl Expr {
             Expr::Unary(operator, right) => visitor.visit_unary(operator, right),
             Expr::Binary(left, operator, right) => visitor.visit_binary(left, operator, right),
             Expr::Ternary(cond, left, right) => visitor.visit_ternary(cond, left, right),
+            Expr::Variable(name) => visitor.visit_variable(name),
         }
     }
 }

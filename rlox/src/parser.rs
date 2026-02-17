@@ -1,11 +1,12 @@
 use crate::{
     expr::Expr,
     stmt::Stmt,
-    token::{Token, TokenType},
+    token::{Literal, Token, TokenType},
 };
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
+    errors: Vec<ParseError>,
     current: usize,
 }
 
@@ -18,16 +19,56 @@ impl<'a> Parser<'a> {
     }
 
     pub fn new(tokens: &'a [Token]) -> Self {
-        Self { tokens, current: 0 }
+        Self {
+            tokens,
+            errors: Vec::new(),
+            current: 0,
+        }
     }
 
-    pub fn parse(mut self) -> Result<Vec<Stmt>, ParseError> {
+    pub fn parse(mut self) -> (Vec<Stmt>, Vec<ParseError>) {
         let mut statements = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement()?);
+            if let Some(stmt) = self.try_program() {
+                statements.push(stmt);
+            }
         }
 
-        Ok(statements)
+        (statements, self.errors)
+    }
+
+    fn try_program(&mut self) -> Option<Stmt> {
+        match self.declaration() {
+            Ok(stmt) => Some(stmt),
+            Err(e) => {
+                self.errors.push(e);
+                self.synchronize();
+                None
+            }
+        }
+    }
+
+    /// declaration -> varDecl | statement
+    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+        if self.advance_if(&[TokenType::Var]) {
+            return self.var_declaration();
+        }
+
+        self.statement()
+    }
+
+    /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
+    fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name.")?.clone();
+
+        // Uninitialized variable
+        let mut expression = Expr::Literal(Literal::Nil);
+        if self.advance_if(&[TokenType::Equal]) {
+            expression = self.expression()?;
+        }
+
+        self.consume(TokenType::Semicolon, "Expect ';' after variable declaration.")?;
+        Ok(Stmt::Var(name, expression))
     }
 
     /// statement -> printStmt | exprStmt
@@ -215,7 +256,7 @@ impl<'a> Parser<'a> {
         self.primary()
     }
 
-    /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")"
+    /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
     fn primary(&mut self) -> Result<Expr, ParseError> {
         // Literals
         let next_tokens_to_match = [
@@ -235,6 +276,10 @@ impl<'a> Parser<'a> {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
             return Ok(Expr::grouping(expr));
+        }
+
+        if self.advance_if(&[TokenType::Identifier]) {
+            return Ok(Expr::Variable(self.previous().clone()));
         }
 
         Err(self.error("Expect expression."))
