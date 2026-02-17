@@ -64,7 +64,7 @@ impl Lox {
             self.report_parse_error(error);
         }
 
-        if let Err(e) = self.interpreter.interpret(statements) {
+        if let Err(e) = self.interpreter.interpret(&statements) {
             self.report_runtime_error(e);
         };
     }

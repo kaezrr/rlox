@@ -4,12 +4,14 @@ pub enum Stmt {
     Expression(Expr),
     Print(Expr),
     Var(Token, Expr),
+    Block(Vec<Stmt>),
 }
 
 pub trait Visitor<R> {
     fn visit_print_stmt(&mut self, expr: &Expr) -> R;
     fn visit_expression_stmt(&mut self, expr: &Expr) -> R;
     fn visit_var_stmt(&mut self, name: &Token, initializer: &Expr) -> R;
+    fn visit_block(&mut self, stmts: &[Stmt]) -> R;
 }
 
 impl Stmt {
@@ -18,6 +20,7 @@ impl Stmt {
             Stmt::Expression(expr) => visitor.visit_expression_stmt(expr),
             Stmt::Print(expr) => visitor.visit_print_stmt(expr),
             Stmt::Var(name, initializer) => visitor.visit_var_stmt(name, initializer),
+            Stmt::Block(stmts) => visitor.visit_block(stmts),
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::hint::unreachable_unchecked;
+
 use crate::{
     environment::Environment,
     expr::{self, Expr},
@@ -11,15 +13,31 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn interpret(&mut self, statements: Vec<Stmt>) -> ExecResult {
+    pub fn interpret(&mut self, statements: &[Stmt]) -> ExecResult {
         for statement in statements {
-            self.execute(&statement)?;
+            self.execute(statement)?;
         }
         Ok(())
     }
 
     fn execute(&mut self, stmt: &Stmt) -> ExecResult {
         stmt.accept(self)
+    }
+
+    fn execute_block(&mut self, statements: &[Stmt], environment: Environment) -> ExecResult {
+        let previous = std::mem::replace(&mut self.environment, environment);
+
+        self.environment.put_enclosing(previous);
+
+        let result = statements.iter().try_for_each(|s| self.execute(s));
+
+        if let Some(previous) = self.environment.take_enclosing() {
+            self.environment = *previous;
+        } else {
+            unreachable!("Previous scope magically disappeared lol.")
+        };
+
+        result
     }
 
     fn evaluate(&mut self, expression: &Expr) -> EvalResult {
@@ -206,5 +224,9 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         }
         self.environment.define(name.lexeme.clone(), value);
         Ok(())
+    }
+
+    fn visit_block(&mut self, stmts: &[Stmt]) -> ExecResult {
+        self.execute_block(stmts, Environment::default())
     }
 }
