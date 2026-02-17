@@ -32,7 +32,7 @@ impl Interpreter {
         result
     }
 
-    fn evaluate(&mut self, expression: &Expr) -> EvalResult {
+    pub fn evaluate(&mut self, expression: &Expr) -> EvalResult {
         expression.accept(self)
     }
 }

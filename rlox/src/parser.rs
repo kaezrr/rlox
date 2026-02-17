@@ -26,6 +26,10 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn parse_expression(&mut self) -> Result<Expr, ParseError> {
+        self.expression()
+    }
+
     pub fn parse(mut self) -> (Vec<Stmt>, Vec<ParseError>) {
         let mut statements = Vec::new();
         while !self.is_at_end() {

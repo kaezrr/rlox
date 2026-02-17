@@ -243,7 +243,7 @@ fn is_alpha_numeric(c: char) -> bool {
     is_alpha(c) || c.is_ascii_digit()
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
