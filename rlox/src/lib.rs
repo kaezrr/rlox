@@ -1,6 +1,7 @@
 mod expr;
 mod interpreter;
 mod parser;
+mod stmt;
 mod token;
 
 use std::{io::Write, path::Path};
@@ -56,17 +57,14 @@ impl Lox {
             self.report(error.line, "", &error.message);
         }
 
-        let expression = match Parser::new(&tokens).parse() {
+        let statements = match Parser::new(&tokens).parse() {
             Ok(expr) => expr,
             Err(e) => return self.report_parse_error(e),
         };
 
-        let value = match self.interpreter.interpret(&expression) {
-            Ok(v) => v,
-            Err(e) => return self.report_runtime_error(e),
+        if let Err(e) = self.interpreter.interpret(statements) {
+            self.report_runtime_error(e);
         };
-
-        eprintln!("{}", value);
     }
 
     fn report_parse_error(&mut self, err: ParseError) {

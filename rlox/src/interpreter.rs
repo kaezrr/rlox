@@ -1,5 +1,6 @@
 use crate::{
-    expr::{Expr, Visitor},
+    expr::{self, Expr},
+    stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
 };
 
@@ -7,8 +8,15 @@ use crate::{
 pub struct Interpreter;
 
 impl Interpreter {
-    pub fn interpret(&mut self, expression: &Expr) -> EvalResult {
-        expression.accept(self)
+    pub fn interpret(&mut self, statements: Vec<Stmt>) -> ExecResult {
+        for statement in statements {
+            self.execute(&statement)?;
+        }
+        Ok(())
+    }
+
+    fn execute(&mut self, stmt: &Stmt) -> ExecResult {
+        stmt.accept(self)
     }
 
     fn evaluate(&mut self, expression: &Expr) -> EvalResult {
@@ -31,8 +39,9 @@ impl RuntimeError {
 }
 
 type EvalResult = Result<Literal, RuntimeError>;
+type ExecResult = Result<(), RuntimeError>;
 
-impl Visitor<EvalResult> for Interpreter {
+impl expr::Visitor<EvalResult> for Interpreter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
         let left = self.evaluate(left)?;
         let right = self.evaluate(right)?;
@@ -163,4 +172,17 @@ fn check_number_operands(operator: &Token, left: &Literal, right: &Literal) -> R
     }
 
     Err(RuntimeError::new(operator, "Operands must be numbers."))
+}
+
+impl stmt::Visitor<ExecResult> for Interpreter {
+    fn visit_print_stmt(&mut self, expr: &Expr) -> ExecResult {
+        let value = self.evaluate(expr)?;
+        println!("{}", value);
+        Ok(())
+    }
+
+    fn visit_expression_stmt(&mut self, expr: &Expr) -> ExecResult {
+        self.evaluate(expr)?;
+        Ok(())
+    }
 }
