@@ -3,15 +3,23 @@ use crate::{expr::Expr, token::Token};
 pub enum Stmt {
     Expression(Expr),
     Print(Expr),
-    Var(Token, Expr),
+    Var(Token, Option<Expr>),
     Block(Vec<Stmt>),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
+}
+
+impl Stmt {
+    pub fn if_else(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Stmt {
+        Stmt::If(condition, Box::new(then_branch), else_branch.map(Box::new))
+    }
 }
 
 pub trait Visitor<R> {
     fn visit_print_stmt(&mut self, expr: &Expr) -> R;
     fn visit_expression_stmt(&mut self, expr: &Expr) -> R;
-    fn visit_var_stmt(&mut self, name: &Token, initializer: &Expr) -> R;
+    fn visit_var_stmt(&mut self, name: &Token, initializer: Option<&Expr>) -> R;
     fn visit_block(&mut self, stmts: &[Stmt]) -> R;
+    fn visit_if_else(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: Option<&Stmt>) -> R;
 }
 
 impl Stmt {
@@ -19,8 +27,9 @@ impl Stmt {
         match self {
             Stmt::Expression(expr) => visitor.visit_expression_stmt(expr),
             Stmt::Print(expr) => visitor.visit_print_stmt(expr),
-            Stmt::Var(name, initializer) => visitor.visit_var_stmt(name, initializer),
+            Stmt::Var(name, initializer) => visitor.visit_var_stmt(name, initializer.as_ref()),
             Stmt::Block(stmts) => visitor.visit_block(stmts),
+            Stmt::If(cond, then_b, else_b) => visitor.visit_if_else(cond, then_b, else_b.as_deref()),
         }
     }
 }

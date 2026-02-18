@@ -83,6 +83,10 @@ impl expr::Visitor<String> for AstPrinter {
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> String {
         self.parenthesize(&format!("= {}", name.lexeme), &[value])
     }
+
+    fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> String {
+        self.parenthesize(&operator.lexeme, &[left, right])
+    }
 }
 
 impl expr::Visitor<String> for RpnPrinter {
@@ -116,5 +120,9 @@ impl expr::Visitor<String> for RpnPrinter {
 
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> String {
         self.post_orderize(&format!("= {}", name.lexeme), &[value])
+    }
+
+    fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> String {
+        self.post_orderize(&operator.lexeme, &[left, right])
     }
 }

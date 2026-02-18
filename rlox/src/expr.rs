@@ -9,6 +9,7 @@ pub enum Expr {
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
     Variable(Token),
     Assign(Token, Box<Expr>),
+    Logical(Box<Expr>, Token, Box<Expr>),
 }
 
 impl Expr {
@@ -39,10 +40,15 @@ impl Expr {
     pub fn assign(name: Token, value: Expr) -> Expr {
         Expr::Assign(name, Box::new(value))
     }
+
+    pub fn logical(left: Expr, operator: Token, right: Expr) -> Expr {
+        Expr::Logical(Box::new(left), operator, Box::new(right))
+    }
 }
 
 pub trait Visitor<R> {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> R;
+    fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> R;
     fn visit_grouping(&mut self, expression: &Expr) -> R;
     fn visit_literal(&mut self, literal: &token::Literal) -> R;
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> R;
@@ -60,6 +66,7 @@ impl Expr {
             Expr::Comma(left, right) => visitor.visit_comma(left, right),
             Expr::Unary(operator, right) => visitor.visit_unary(operator, right),
             Expr::Binary(left, operator, right) => visitor.visit_binary(left, operator, right),
+            Expr::Logical(left, operator, right) => visitor.visit_logical(left, operator, right),
             Expr::Ternary(cond, left, right) => visitor.visit_ternary(cond, left, right),
             Expr::Variable(name) => visitor.visit_variable(name),
             Expr::Assign(name, value) => visitor.visit_assign(name, value),

@@ -176,6 +176,20 @@ impl expr::Visitor<EvalResult> for Interpreter {
         let value = self.evaluate(value)?;
         self.scope.assign(name, value)
     }
+
+    fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
+        let left = self.evaluate(left)?;
+
+        if operator.token_type == TokenType::Or {
+            if left.is_truthy() {
+                return Ok(left);
+            }
+        } else if !left.is_truthy() {
+            return Ok(left);
+        }
+
+        self.evaluate(right)
+    }
 }
 
 fn check_number_operand(operator: &Token, operand: &Literal) -> Result<f64, RuntimeError> {
@@ -208,17 +222,29 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         Ok(())
     }
 
-    fn visit_var_stmt(&mut self, name: &Token, initializer: &Expr) -> ExecResult {
-        let mut value = Literal::Nil;
+    fn visit_var_stmt(&mut self, name: &Token, initializer: Option<&Expr>) -> ExecResult {
+        let value = match initializer {
+            Some(v) => self.evaluate(v)?,
+            None => Literal::Nil,
+        };
 
-        if !matches!(initializer, Expr::Literal(Literal::Nil)) {
-            value = self.evaluate(initializer)?;
-        }
         self.scope.define(name.lexeme.clone(), value);
         Ok(())
     }
 
     fn visit_block(&mut self, stmts: &[Stmt]) -> ExecResult {
         self.execute_block(stmts)
+    }
+
+    fn visit_if_else(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: Option<&Stmt>) -> ExecResult {
+        let condition = self.evaluate(condition)?.is_truthy();
+
+        if condition {
+            self.execute(then_branch)
+        } else if let Some(branch) = else_branch {
+            self.execute(branch)
+        } else {
+            Ok(())
+        }
     }
 }

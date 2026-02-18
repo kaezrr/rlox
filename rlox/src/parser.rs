@@ -1,7 +1,7 @@
 use crate::{
     expr::Expr,
     stmt::Stmt,
-    token::{Literal, Token, TokenType},
+    token::{Token, TokenType},
 };
 
 pub struct Parser<'a> {
@@ -66,17 +66,22 @@ impl<'a> Parser<'a> {
         let name = self.consume(TokenType::Identifier, "Expect variable name.")?.clone();
 
         // Uninitialized variable
-        let mut expression = Expr::Literal(Literal::Nil);
-        if self.advance_if(&[TokenType::Equal]) {
-            expression = self.expression()?;
-        }
+        let expression = if self.advance_if(&[TokenType::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
 
         self.consume(TokenType::Semicolon, "Expect ';' after variable declaration.")?;
         Ok(Stmt::Var(name, expression))
     }
 
-    /// statement -> printStmt | exprStmt | block
+    /// statement -> printStmt | ifStmt | exprStmt | block
     fn statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.advance_if(&[TokenType::If]) {
+            return self.if_statement();
+        }
+
         if self.advance_if(&[TokenType::Print]) {
             return self.print_statement();
         }
@@ -86,6 +91,23 @@ impl<'a> Parser<'a> {
         }
 
         self.expression_statement()
+    }
+
+    /// ifStmt -> "if" "(" expression ")" statement ("else" statement)?
+    fn if_statement(&mut self) -> Result<Stmt, ParseError> {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        let then_branch = self.statement()?;
+
+        let else_branch = if self.advance_if(&[TokenType::Else]) {
+            Some(self.statement()?)
+        } else {
+            None
+        };
+
+        Ok(Stmt::if_else(condition, then_branch, else_branch))
     }
 
     /// block -> "{" declaration* "}"
@@ -158,7 +180,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// ternary -> (equality "?" ternary ":" ternary) | equality
+    /// ternary -> (logic_or "?" ternary ":" ternary) | logic_or
     fn ternary(&mut self) -> Result<Expr, ParseError> {
         // Missing left operand
         if self.check(&[TokenType::Question]) {
@@ -169,13 +191,39 @@ impl<'a> Parser<'a> {
             return Err(err);
         }
 
-        let mut expr = self.equality()?;
+        let mut expr = self.or()?;
 
         if self.advance_if(&[TokenType::Question]) {
             let left = self.ternary()?;
             self.consume(TokenType::Colon, "Expect ':' after ternary expression")?;
             let right = self.ternary()?;
             expr = Expr::ternary(expr, left, right);
+        }
+
+        Ok(expr)
+    }
+
+    /// logic_or = logic_and ("or" logic_and)*
+    fn or(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.and()?;
+
+        while self.advance_if(&[TokenType::Or]) {
+            let operator = self.previous().clone();
+            let right = self.and()?;
+            expr = Expr::logical(expr, operator, right);
+        }
+
+        Ok(expr)
+    }
+
+    /// logic_and = equality ("and" equality)*
+    fn and(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.equality()?;
+
+        while self.advance_if(&[TokenType::And]) {
+            let operator = self.previous().clone();
+            let right = self.equality()?;
+            expr = Expr::logical(expr, operator, right);
         }
 
         Ok(expr)
