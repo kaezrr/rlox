@@ -60,11 +60,39 @@ impl<'a> Parser<'a> {
             return self.var_declaration();
         }
 
+        if self.advance_if(&[TokenType::Fun]) {
+            return self.function("function");
+        }
+
         self.statement()
     }
 
-    fn fun_declaration(&mut self) -> Result<Stmt, ParseError> {
-        todo!()
+    /// function -> IDENTIFIER "(" parameters? ")" block
+    fn function(&mut self, kind: &str) -> Result<Stmt, ParseError> {
+        let name = self
+            .consume(TokenType::Identifier, &format!("Expect {} name.", kind))?
+            .clone();
+
+        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.", kind))?;
+        let mut parameters = Vec::new();
+
+        if !self.check(&[TokenType::RightParen]) {
+            parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?.clone());
+            while self.advance_if(&[TokenType::Comma]) {
+                if parameters.len() >= 255 {
+                    let err = self.error(self.peek().clone(), "Can't have more than 255 parameters.");
+                    self.errors.push(err);
+                }
+                parameters.push(self.consume(TokenType::Identifier, "Expect parameter name.")?.clone());
+            }
+        }
+
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
+        self.consume(TokenType::LeftBrace, &format!("Expect '{{' before {} body.", kind))?;
+
+        let body = self.block()?;
+
+        Ok(Stmt::Function(name, parameters, body))
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"

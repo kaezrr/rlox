@@ -306,4 +306,8 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     fn visit_break(&mut self) -> ExecResult {
         Ok(ExecSignal::Break)
     }
+
+    fn visit_function(&mut self, name: &Token, params: &[Token], body: &[Stmt]) -> ExecResult {
+        todo!()
+    }
 }
