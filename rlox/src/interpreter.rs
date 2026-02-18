@@ -15,7 +15,7 @@ impl Interpreter {
         for statement in statements {
             self.execute(statement)?;
         }
-        Ok(())
+        Ok(ExecSignal::None)
     }
 
     fn execute(&mut self, stmt: &Stmt) -> ExecResult {
@@ -25,7 +25,14 @@ impl Interpreter {
     fn execute_block(&mut self, statements: &[Stmt]) -> ExecResult {
         self.scope.push();
 
-        let result = statements.iter().try_for_each(|s| self.execute(s));
+        let result = (|| {
+            for stmt in statements {
+                if let ExecSignal::Break = self.execute(stmt)? {
+                    return Ok(ExecSignal::Break);
+                }
+            }
+            Ok(ExecSignal::None)
+        })();
 
         self.scope.pop();
 
@@ -52,7 +59,12 @@ impl RuntimeError {
 }
 
 type EvalResult = Result<Literal, RuntimeError>;
-type ExecResult = Result<(), RuntimeError>;
+type ExecResult = Result<ExecSignal, RuntimeError>;
+
+pub enum ExecSignal {
+    None,
+    Break,
+}
 
 impl expr::Visitor<EvalResult> for Interpreter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
@@ -214,12 +226,12 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     fn visit_print_stmt(&mut self, expr: &Expr) -> ExecResult {
         let value = self.evaluate(expr)?;
         println!("{}", value);
-        Ok(())
+        Ok(ExecSignal::None)
     }
 
     fn visit_expression_stmt(&mut self, expr: &Expr) -> ExecResult {
         self.evaluate(expr)?;
-        Ok(())
+        Ok(ExecSignal::None)
     }
 
     fn visit_var_stmt(&mut self, name: &Token, initializer: Option<&Expr>) -> ExecResult {
@@ -229,7 +241,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         };
 
         self.scope.define(name.lexeme.clone(), value);
-        Ok(())
+        Ok(ExecSignal::None)
     }
 
     fn visit_block(&mut self, stmts: &[Stmt]) -> ExecResult {
@@ -244,15 +256,21 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         } else if let Some(branch) = else_branch {
             self.execute(branch)
         } else {
-            Ok(())
+            Ok(ExecSignal::None)
         }
     }
 
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> ExecResult {
         while self.evaluate(condition)?.is_truthy() {
-            self.execute(body)?;
+            if let ExecSignal::Break = self.execute(body)? {
+                break;
+            }
         }
 
-        Ok(())
+        Ok(ExecSignal::None)
+    }
+
+    fn visit_break(&mut self) -> ExecResult {
+        Ok(ExecSignal::Break)
     }
 }

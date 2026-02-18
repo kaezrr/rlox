@@ -8,6 +8,7 @@ pub struct Parser<'a> {
     tokens: &'a [Token],
     errors: Vec<ParseError>,
     current: usize,
+    loop_depth: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -23,6 +24,7 @@ impl<'a> Parser<'a> {
             tokens,
             errors: Vec::new(),
             current: 0,
+            loop_depth: 0,
         }
     }
 
@@ -76,7 +78,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Var(name, expression))
     }
 
-    /// statement -> printStmt | ifStmt | exprStmt | whileStmt | forStmt | block
+    /// statement -> printStmt | ifStmt | exprStmt | whileStmt | forStmt | breakStmt | block
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         if self.advance_if(&[TokenType::If]) {
             return self.if_statement();
@@ -94,11 +96,25 @@ impl<'a> Parser<'a> {
             return self.print_statement();
         }
 
+        if self.advance_if(&[TokenType::Break]) {
+            return self.break_statement();
+        }
+
         if self.advance_if(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block(self.block()?));
         }
 
         self.expression_statement()
+    }
+
+    /// breakStmt -> "break" ";"
+    fn break_statement(&mut self) -> Result<Stmt, ParseError> {
+        if self.loop_depth == 0 {
+            return Err(self.error(self.previous().clone(), "'break' outside loop statement."));
+        }
+
+        self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
+        Ok(Stmt::Break)
     }
 
     /// ifStmt -> "if" "(" expression ")" statement ("else" statement)?
@@ -149,7 +165,10 @@ impl<'a> Parser<'a> {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
+
+        self.loop_depth += 1;
         let body = self.statement()?;
+        self.loop_depth -= 1;
 
         Ok(Stmt::while_st(condition, body))
     }
@@ -182,7 +201,9 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::RightParen, "Expect ')' after clauses.")?;
 
+        self.loop_depth += 1;
         let mut body = self.statement()?;
+        self.loop_depth -= 1;
 
         if let Some(inc) = increment {
             body = Stmt::Block(vec![body, Stmt::Expression(inc)]);
