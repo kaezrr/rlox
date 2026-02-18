@@ -54,13 +54,17 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// declaration -> varDecl | statement
+    /// declaration -> varDecl | funDecl | statement
     fn declaration(&mut self) -> Result<Stmt, ParseError> {
         if self.advance_if(&[TokenType::Var]) {
             return self.var_declaration();
         }
 
         self.statement()
+    }
+
+    fn fun_declaration(&mut self) -> Result<Stmt, ParseError> {
+        todo!()
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
@@ -220,12 +224,33 @@ impl<'a> Parser<'a> {
 
     /// expression -> comma
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.assignment()
+        self.comma()
     }
 
-    /// assignment -> IDENTIFIER "=" assignment | comma
+    /// comma -> assignment ("," assignment)*
+    fn comma(&mut self) -> Result<Expr, ParseError> {
+        // Missing left operand
+        if self.check(&[TokenType::Comma]) {
+            let err = self.error(self.peek().clone(), "Expect expression before comma");
+            while self.advance_if(&[TokenType::Comma]) {
+                let _ = self.assignment();
+            }
+            return Err(err);
+        }
+
+        let mut expr = self.assignment()?;
+
+        while self.advance_if(&[TokenType::Comma]) {
+            let right = self.assignment()?;
+            expr = Expr::comma(expr, right);
+        }
+
+        Ok(expr)
+    }
+
+    /// assignment -> IDENTIFIER "=" assignment | ternary
     fn assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.comma()?;
+        let expr = self.ternary()?;
 
         if self.advance_if(&[TokenType::Equal]) {
             let equals = self.previous().clone();
@@ -236,27 +261,6 @@ impl<'a> Parser<'a> {
             }
 
             return Err(self.error(equals, "Invalid assignment target"));
-        }
-
-        Ok(expr)
-    }
-
-    /// comma -> ternary ("," ternary)*
-    fn comma(&mut self) -> Result<Expr, ParseError> {
-        // Missing left operand
-        if self.check(&[TokenType::Comma]) {
-            let err = self.error(self.peek().clone(), "Expect expression before comma");
-            while self.advance_if(&[TokenType::Comma]) {
-                let _ = self.ternary();
-            }
-            return Err(err);
-        }
-
-        let mut expr = self.ternary()?;
-
-        while self.advance_if(&[TokenType::Comma]) {
-            let right = self.ternary()?;
-            expr = Expr::comma(expr, right);
         }
 
         Ok(expr)
@@ -412,7 +416,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// unary -> ("!" | "-") unary | primary
+    /// unary -> ("!" | "-") unary | call
     fn unary(&mut self) -> Result<Expr, ParseError> {
         let next_tokens_to_match = [TokenType::Bang, TokenType::Minus];
 
@@ -422,7 +426,44 @@ impl<'a> Parser<'a> {
             return Ok(Expr::unary(operator, right));
         }
 
-        self.primary()
+        self.call()
+    }
+
+    /// call -> primary ( "(" arguments? ")" )*
+    fn call(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.advance_if(&[TokenType::LeftParen]) {
+                expr = self.arguments(expr)?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
+    /// arguments -> assignment ("," assignment)*
+    fn arguments(&mut self, callee: Expr) -> Result<Expr, ParseError> {
+        let mut arguments = Vec::new();
+        if !self.check(&[TokenType::RightParen]) {
+            arguments.push(self.assignment()?);
+
+            while self.advance_if(&[TokenType::Comma]) {
+                if arguments.len() >= 255 {
+                    let err = self.error(self.peek().clone(), "Can't have more than 255 arguments.");
+                    self.errors.push(err);
+                }
+                arguments.push(self.assignment()?);
+            }
+        }
+
+        let paren = self
+            .consume(TokenType::RightParen, "Expect ')' after arguments.")?
+            .clone();
+
+        Ok(Expr::call(callee, paren, arguments))
     }
 
     /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER

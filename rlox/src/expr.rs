@@ -10,6 +10,7 @@ pub enum Expr {
     Variable(Token),
     Assign(Token, Box<Expr>),
     Logical(Box<Expr>, Token, Box<Expr>),
+    Call(Box<Expr>, Token, Vec<Expr>),
 }
 
 impl Expr {
@@ -44,6 +45,10 @@ impl Expr {
     pub fn logical(left: Expr, operator: Token, right: Expr) -> Expr {
         Expr::Logical(Box::new(left), operator, Box::new(right))
     }
+
+    pub fn call(callee: Expr, paren: Token, arguments: Vec<Expr>) -> Expr {
+        Expr::Call(Box::new(callee), paren, arguments)
+    }
 }
 
 pub trait Visitor<R> {
@@ -56,6 +61,7 @@ pub trait Visitor<R> {
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> R;
     fn visit_variable(&mut self, name: &Token) -> R;
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> R;
+    fn visit_call(&mut self, callee: &Expr, paren: &Token, arguments: &[Expr]) -> R;
 }
 
 impl Expr {
@@ -70,6 +76,7 @@ impl Expr {
             Expr::Ternary(cond, left, right) => visitor.visit_ternary(cond, left, right),
             Expr::Variable(name) => visitor.visit_variable(name),
             Expr::Assign(name, value) => visitor.visit_assign(name, value),
+            Expr::Call(callee, paren, arguments) => visitor.visit_call(callee, paren, arguments),
         }
     }
 }

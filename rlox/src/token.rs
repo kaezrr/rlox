@@ -1,4 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
+
+use crate::callable::Callable;
 
 pub struct Scanner {
     source: Vec<u8>,
@@ -243,7 +245,7 @@ fn is_alpha_numeric(c: char) -> bool {
     is_alpha(c) || c.is_ascii_digit()
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
@@ -265,7 +267,7 @@ impl Token {
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.literal {
-            Some(lit) => write!(f, "{:?} {} {:?}", self.token_type, self.lexeme, lit),
+            Some(lit) => write!(f, "{:?} {} {}", self.token_type, self.lexeme, lit),
             None => write!(f, "{:?} {}", self.token_type, self.lexeme),
         }
     }
@@ -349,8 +351,9 @@ pub enum TokenType {
     Eof,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Clone)]
 pub enum Literal {
+    Callable(Arc<Callable>),
     Number(f64),
     String(String),
     Boolean(bool),
@@ -364,6 +367,7 @@ impl Display for Literal {
             Literal::String(v) => write!(f, "\"{}\"", v),
             Literal::Boolean(v) => write!(f, "{}", v),
             Literal::Nil => write!(f, "nil"),
+            Literal::Callable(v) => write!(f, "<{} fn>", v.name),
         }
     }
 }

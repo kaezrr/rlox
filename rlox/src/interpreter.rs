@@ -58,8 +58,8 @@ impl RuntimeError {
     }
 }
 
-type EvalResult = Result<Literal, RuntimeError>;
-type ExecResult = Result<ExecSignal, RuntimeError>;
+pub type EvalResult = Result<Literal, RuntimeError>;
+pub type ExecResult = Result<ExecSignal, RuntimeError>;
 
 pub enum ExecSignal {
     None,
@@ -136,9 +136,9 @@ impl expr::Visitor<EvalResult> for Interpreter {
                 )),
             },
 
-            TokenType::EqualEqual => Ok(Literal::Boolean(left == right)),
+            TokenType::EqualEqual => Ok(Literal::Boolean(is_equal(&left, &right))),
 
-            TokenType::BangEqual => Ok(Literal::Boolean(left != right)),
+            TokenType::BangEqual => Ok(Literal::Boolean(!is_equal(&left, &right))),
 
             _ => unreachable!(),
         }
@@ -201,6 +201,39 @@ impl expr::Visitor<EvalResult> for Interpreter {
         }
 
         self.evaluate(right)
+    }
+
+    fn visit_call(&mut self, callee: &Expr, paren: &Token, arguments: &[Expr]) -> EvalResult {
+        let callee = self.evaluate(callee)?;
+        let mut args = Vec::with_capacity(arguments.len());
+
+        for arg in arguments {
+            args.push(self.evaluate(arg)?);
+        }
+
+        let Literal::Callable(function) = callee else {
+            return Err(RuntimeError::new(paren, "Can only call function and classes."));
+        };
+
+        if args.len() != function.arity {
+            return Err(RuntimeError::new(
+                paren,
+                &format!("Expected {} arguments but got {}.", function.arity, args.len()),
+            ));
+        }
+
+        function.call(self, args)
+    }
+}
+
+fn is_equal(left: &Literal, right: &Literal) -> bool {
+    match (left, right) {
+        (Literal::Number(a), Literal::Number(b)) => a == b,
+        (Literal::String(a), Literal::String(b)) => a == b,
+        (Literal::Boolean(a), Literal::Boolean(b)) => a == b,
+        (Literal::Nil, Literal::Nil) => true,
+        (Literal::Callable(a), Literal::Callable(b)) => std::sync::Arc::ptr_eq(a, b),
+        _ => false,
     }
 }
 

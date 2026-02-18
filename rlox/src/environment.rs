@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    callable::NativeClock,
     interpreter::RuntimeError,
     token::{Literal, Token},
 };
@@ -13,8 +14,11 @@ pub struct Scope {
 
 impl Default for Scope {
     fn default() -> Self {
+        let mut global = ScopeData::new();
+        global.insert("clock".to_string(), Literal::Callable(NativeClock::as_callable()));
+
         Self {
-            environments: vec![ScopeData::default()],
+            environments: vec![global],
         }
     }
 }
@@ -36,7 +40,7 @@ impl Scope {
     pub fn get(&self, name: &Token) -> Result<Literal, RuntimeError> {
         for env in self.environments.iter().rev() {
             if let Some(value) = env.get(&name.lexeme) {
-                if *value == Literal::Nil {
+                if let Literal::Nil = *value {
                     return Err(uninitialized_error(name));
                 }
                 return Ok(value.clone());
