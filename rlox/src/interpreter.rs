@@ -124,9 +124,9 @@ impl expr::Visitor<EvalResult> for Interpreter {
                 )),
             },
 
-            TokenType::BangEqual => Ok(Literal::Boolean(left.is_truthy() != right.is_truthy())),
+            TokenType::EqualEqual => Ok(Literal::Boolean(left == right)),
 
-            TokenType::EqualEqual => Ok(Literal::Boolean(left.is_truthy() == right.is_truthy())),
+            TokenType::BangEqual => Ok(Literal::Boolean(left != right)),
 
             _ => unreachable!(),
         }

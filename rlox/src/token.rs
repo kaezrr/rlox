@@ -289,6 +289,7 @@ fn try_keyword(keyword_str: &str) -> Option<TokenType> {
         "true" => Some(TokenType::True),
         "var" => Some(TokenType::Var),
         "while" => Some(TokenType::While),
+        "break" => Some(TokenType::Break),
         _ => None,
     }
 }
@@ -343,6 +344,7 @@ pub enum TokenType {
     True,
     Var,
     While,
+    Break,
 
     Eof,
 }
