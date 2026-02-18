@@ -247,4 +247,12 @@ impl stmt::Visitor<ExecResult> for Interpreter {
             Ok(())
         }
     }
+
+    fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> ExecResult {
+        while self.evaluate(condition)?.is_truthy() {
+            self.execute(body)?;
+        }
+
+        Ok(())
+    }
 }
