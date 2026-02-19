@@ -294,11 +294,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_var_stmt(&mut self, name: &Token, initializer: Option<&Expr>) -> ExecResult {
-        let value = match initializer {
-            Some(v) => self.evaluate(v)?,
-            None => Literal::Nil,
-        };
-
+        let value = initializer.map(|v| self.evaluate(v)).transpose()?;
         self.current_scope.borrow_mut().define(name.lexeme.clone(), value);
         Ok(ExecSignal::None)
     }

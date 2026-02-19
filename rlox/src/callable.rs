@@ -51,7 +51,7 @@ impl LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
         let mut local_data = HashMap::new();
         for (param, arg) in self.params.iter().zip(args) {
-            local_data.insert(param.lexeme.clone(), arg);
+            local_data.insert(param.lexeme.clone(), Some(arg));
         }
 
         let call_scope = Rc::new(RefCell::new(Scope {
