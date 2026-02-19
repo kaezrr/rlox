@@ -71,16 +71,16 @@ impl<'a> Parser<'a> {
     fn function(&mut self, kind: &str) -> Result<Stmt, ParseError> {
         if self.advance_if(&[TokenType::Identifier]) {
             let name = self.previous().clone();
-            let function = self.lambda(kind)?;
+            let function = self.lambda(Some(name.clone()), kind)?;
 
             return Ok(Stmt::Var(name, Some(function)));
         }
 
-        Ok(Stmt::Expression(self.lambda(kind)?))
+        Ok(Stmt::Expression(self.lambda(None, kind)?))
     }
 
     /// function -> "fun" "(" parameters? ")" block
-    fn lambda(&mut self, kind: &str) -> Result<Expr, ParseError> {
+    fn lambda(&mut self, name: Option<Token>, kind: &str) -> Result<Expr, ParseError> {
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {}.", kind))?;
         let mut parameters = Vec::new();
 
@@ -100,7 +100,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block()?;
 
-        Ok(Expr::Lambda(parameters, body))
+        Ok(Expr::Lambda(name, parameters, body))
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
@@ -547,7 +547,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.advance_if(&[TokenType::Fun]) {
-            return self.lambda("function");
+            return self.lambda(None, "function");
         }
 
         Err(self.error(self.peek().clone(), "Expect expression."))

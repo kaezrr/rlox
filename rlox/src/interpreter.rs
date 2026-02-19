@@ -237,14 +237,14 @@ impl expr::Visitor<EvalResult> for Interpreter {
         })
     }
 
-    fn visit_anonymous_func(&mut self, params: &[Token], body: &[Stmt]) -> EvalResult {
+    fn visit_anonymous_func(&mut self, name: Option<&Token>, params: &[Token], body: &[Stmt]) -> EvalResult {
         let params = params.to_vec();
         let body = body.to_vec();
 
         let closure = self.current_scope.clone();
 
         Ok(Literal::Callable(Rc::new(Callable::lox_function(
-            "anonymous",
+            name.map_or("anonymous", |x| &x.lexeme),
             params,
             body,
             closure,
