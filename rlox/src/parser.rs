@@ -1,14 +1,17 @@
 use crate::{
-    expr::Expr,
+    expr::{Expr, ExprKind},
     stmt::Stmt,
     token::{Literal, Token, TokenType},
 };
+
+type ParseResult = Result<Expr, ParseError>;
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
     errors: Vec<ParseError>,
     current: usize,
     loop_depth: usize,
+    id_seed: u32,
 }
 
 impl<'a> Parser<'a> {
@@ -25,10 +28,16 @@ impl<'a> Parser<'a> {
             errors: Vec::new(),
             current: 0,
             loop_depth: 0,
+            id_seed: 0,
         }
     }
 
-    pub fn parse_expression(&mut self) -> Result<Expr, ParseError> {
+    pub fn build_expr(&mut self, kind: ExprKind) -> Expr {
+        self.id_seed += 1;
+        Expr { id: self.id_seed, kind }
+    }
+
+    pub fn parse_expression(&mut self) -> ParseResult {
         self.expression()
     }
 
@@ -80,7 +89,7 @@ impl<'a> Parser<'a> {
     }
 
     /// function -> "fun" "(" parameters? ")" block
-    fn lambda(&mut self, name: Option<Token>, kind: &str) -> Result<Expr, ParseError> {
+    fn lambda(&mut self, name: Option<Token>, kind: &str) -> ParseResult {
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {}.", kind))?;
         let mut parameters = Vec::new();
 
@@ -100,7 +109,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block()?;
 
-        Ok(Expr::Lambda(name, parameters, body))
+        Ok(self.build_expr(ExprKind::Lambda(name, parameters, body)))
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
@@ -245,7 +254,7 @@ impl<'a> Parser<'a> {
         let condition = if !self.check(&[TokenType::Semicolon]) {
             self.expression()?
         } else {
-            Expr::literal(Literal::Boolean(true))
+            self.build_expr(ExprKind::literal(Literal::Boolean(true)))
         };
 
         self.consume(TokenType::Semicolon, "Expect ';' after loop condition")?;
@@ -276,12 +285,12 @@ impl<'a> Parser<'a> {
     }
 
     /// expression -> comma
-    fn expression(&mut self) -> Result<Expr, ParseError> {
+    fn expression(&mut self) -> ParseResult {
         self.comma()
     }
 
     /// comma -> assignment ("," assignment)*
-    fn comma(&mut self) -> Result<Expr, ParseError> {
+    fn comma(&mut self) -> ParseResult {
         // Missing left operand
         if self.check(&[TokenType::Comma]) {
             let err = self.error(self.peek().clone(), "Expect expression before comma");
@@ -295,22 +304,22 @@ impl<'a> Parser<'a> {
 
         while self.advance_if(&[TokenType::Comma]) {
             let right = self.assignment()?;
-            expr = Expr::comma(expr, right);
+            expr = self.build_expr(ExprKind::comma(expr, right));
         }
 
         Ok(expr)
     }
 
     /// assignment -> IDENTIFIER "=" assignment | ternary
-    fn assignment(&mut self) -> Result<Expr, ParseError> {
+    fn assignment(&mut self) -> ParseResult {
         let expr = self.ternary()?;
 
         if self.advance_if(&[TokenType::Equal]) {
             let equals = self.previous().clone();
             let value = self.assignment()?;
 
-            if let Expr::Variable(name) = expr {
-                return Ok(Expr::assign(name, value));
+            if let ExprKind::Variable(name) = expr.kind {
+                return Ok(self.build_expr(ExprKind::assign(name, value)));
             }
 
             return Err(self.error(equals, "Invalid assignment target"));
@@ -320,7 +329,7 @@ impl<'a> Parser<'a> {
     }
 
     /// ternary -> (logic_or "?" ternary ":" ternary) | logic_or
-    fn ternary(&mut self) -> Result<Expr, ParseError> {
+    fn ternary(&mut self) -> ParseResult {
         // Missing left operand
         if self.check(&[TokenType::Question]) {
             let err = self.error(self.peek().clone(), "Expect condition in ternary expression");
@@ -336,40 +345,40 @@ impl<'a> Parser<'a> {
             let left = self.ternary()?;
             self.consume(TokenType::Colon, "Expect ':' after ternary expression")?;
             let right = self.ternary()?;
-            expr = Expr::ternary(expr, left, right);
+            expr = self.build_expr(ExprKind::ternary(expr, left, right));
         }
 
         Ok(expr)
     }
 
     /// logic_or = logic_and ("or" logic_and)*
-    fn or(&mut self) -> Result<Expr, ParseError> {
+    fn or(&mut self) -> ParseResult {
         let mut expr = self.and()?;
 
         while self.advance_if(&[TokenType::Or]) {
             let operator = self.previous().clone();
             let right = self.and()?;
-            expr = Expr::logical(expr, operator, right);
+            expr = self.build_expr(ExprKind::logical(expr, operator, right));
         }
 
         Ok(expr)
     }
 
     /// logic_and = equality ("and" equality)*
-    fn and(&mut self) -> Result<Expr, ParseError> {
+    fn and(&mut self) -> ParseResult {
         let mut expr = self.equality()?;
 
         while self.advance_if(&[TokenType::And]) {
             let operator = self.previous().clone();
             let right = self.equality()?;
-            expr = Expr::logical(expr, operator, right);
+            expr = self.build_expr(ExprKind::logical(expr, operator, right));
         }
 
         Ok(expr)
     }
 
     /// equality -> comparison (("==" | "!=") comparison)*
-    fn equality(&mut self) -> Result<Expr, ParseError> {
+    fn equality(&mut self) -> ParseResult {
         let next_tokens_to_match = [TokenType::BangEqual, TokenType::EqualEqual];
 
         // Missing left operand
@@ -386,14 +395,14 @@ impl<'a> Parser<'a> {
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
-            expr = Expr::binary(expr, operator, right)
+            expr = self.build_expr(ExprKind::binary(expr, operator, right));
         }
 
         Ok(expr)
     }
 
     /// comparison -> term (("> | ">=" | "<" | "<=") term)*
-    fn comparison(&mut self) -> Result<Expr, ParseError> {
+    fn comparison(&mut self) -> ParseResult {
         let next_tokens_to_match = [
             TokenType::Greater,
             TokenType::GreaterEqual,
@@ -415,14 +424,14 @@ impl<'a> Parser<'a> {
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
             let right = self.term()?;
-            expr = Expr::binary(expr, operator, right)
+            expr = self.build_expr(ExprKind::binary(expr, operator, right));
         }
 
         Ok(expr)
     }
 
     /// term -> factor (("-" | "+") factor)*
-    fn term(&mut self) -> Result<Expr, ParseError> {
+    fn term(&mut self) -> ParseResult {
         let next_tokens_to_match = [TokenType::Minus, TokenType::Plus];
 
         // Missing left operand
@@ -439,14 +448,14 @@ impl<'a> Parser<'a> {
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
             let right = self.factor()?;
-            expr = Expr::binary(expr, operator, right)
+            expr = self.build_expr(ExprKind::binary(expr, operator, right));
         }
 
         Ok(expr)
     }
 
     /// factor -> unary (("/" | "*") unary)*
-    fn factor(&mut self) -> Result<Expr, ParseError> {
+    fn factor(&mut self) -> ParseResult {
         let next_tokens_to_match = [TokenType::Slash, TokenType::Star];
 
         // Missing left operand
@@ -463,27 +472,27 @@ impl<'a> Parser<'a> {
         while self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            expr = Expr::binary(expr, operator, right);
+            expr = self.build_expr(ExprKind::binary(expr, operator, right));
         }
 
         Ok(expr)
     }
 
     /// unary -> ("!" | "-") unary | call
-    fn unary(&mut self) -> Result<Expr, ParseError> {
+    fn unary(&mut self) -> ParseResult {
         let next_tokens_to_match = [TokenType::Bang, TokenType::Minus];
 
         if self.advance_if(&next_tokens_to_match) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            return Ok(Expr::unary(operator, right));
+            return Ok(self.build_expr(ExprKind::unary(operator, right)));
         }
 
         self.call()
     }
 
     /// call -> primary ( "(" arguments? ")" )*
-    fn call(&mut self) -> Result<Expr, ParseError> {
+    fn call(&mut self) -> ParseResult {
         let mut expr = self.primary()?;
 
         loop {
@@ -498,7 +507,7 @@ impl<'a> Parser<'a> {
     }
 
     /// arguments -> assignment ("," assignment)*
-    fn arguments(&mut self, callee: Expr) -> Result<Expr, ParseError> {
+    fn arguments(&mut self, callee: Expr) -> ParseResult {
         let mut arguments = Vec::new();
         if !self.check(&[TokenType::RightParen]) {
             arguments.push(self.assignment()?);
@@ -516,12 +525,12 @@ impl<'a> Parser<'a> {
             .consume(TokenType::RightParen, "Expect ')' after arguments.")?
             .clone();
 
-        Ok(Expr::call(callee, paren, arguments))
+        Ok(self.build_expr(ExprKind::call(callee, paren, arguments)))
     }
 
     /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER |
     /// Lambda
-    fn primary(&mut self) -> Result<Expr, ParseError> {
+    fn primary(&mut self) -> ParseResult {
         // Literals
         let next_tokens_to_match = [
             TokenType::True,
@@ -533,17 +542,17 @@ impl<'a> Parser<'a> {
 
         if self.advance_if(&next_tokens_to_match) {
             let literal = self.previous().literal.as_ref().unwrap();
-            return Ok(Expr::literal(literal.clone()));
+            return Ok(self.build_expr(ExprKind::literal(literal.clone())));
         }
 
         if self.advance_if(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-            return Ok(Expr::grouping(expr));
+            return Ok(self.build_expr(ExprKind::grouping(expr)));
         }
 
         if self.advance_if(&[TokenType::Identifier]) {
-            return Ok(Expr::Variable(self.previous().clone()));
+            return Ok(self.build_expr(ExprKind::Variable(self.previous().clone())));
         }
 
         if self.advance_if(&[TokenType::Fun]) {
