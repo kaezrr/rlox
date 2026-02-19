@@ -1,4 +1,7 @@
-use crate::token::{self, Token};
+use crate::{
+    stmt::Stmt,
+    token::{self, Token},
+};
 
 #[derive(Clone)]
 pub enum Expr {
@@ -12,6 +15,7 @@ pub enum Expr {
     Assign(Token, Box<Expr>),
     Logical(Box<Expr>, Token, Box<Expr>),
     Call(Box<Expr>, Token, Vec<Expr>),
+    Lambda(Vec<Token>, Vec<Stmt>),
 }
 
 impl Expr {
@@ -63,6 +67,7 @@ pub trait Visitor<R> {
     fn visit_variable(&mut self, name: &Token) -> R;
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> R;
     fn visit_call(&mut self, callee: &Expr, paren: &Token, arguments: &[Expr]) -> R;
+    fn visit_anonymous_func(&mut self, params: &[Token], body: &[Stmt]) -> R;
 }
 
 impl Expr {
@@ -78,6 +83,7 @@ impl Expr {
             Expr::Variable(name) => visitor.visit_variable(name),
             Expr::Assign(name, value) => visitor.visit_assign(name, value),
             Expr::Call(callee, paren, arguments) => visitor.visit_call(callee, paren, arguments),
+            Expr::Lambda(params, body) => visitor.visit_anonymous_func(params, body),
         }
     }
 }

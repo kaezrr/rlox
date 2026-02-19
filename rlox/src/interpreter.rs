@@ -236,6 +236,20 @@ impl expr::Visitor<EvalResult> for Interpreter {
             _ => unreachable!(),
         })
     }
+
+    fn visit_anonymous_func(&mut self, params: &[Token], body: &[Stmt]) -> EvalResult {
+        let params = params.to_vec();
+        let body = body.to_vec();
+
+        let closure = self.current_scope.clone();
+
+        Ok(Literal::Callable(Rc::new(Callable::lox_function(
+            "anonymous",
+            params,
+            body,
+            closure,
+        ))))
+    }
 }
 
 fn is_equal(left: &Literal, right: &Literal) -> bool {
@@ -322,20 +336,6 @@ impl stmt::Visitor<ExecResult> for Interpreter {
 
     fn visit_break(&mut self) -> ExecResult {
         Ok(ExecSignal::Break)
-    }
-
-    fn visit_function(&mut self, name: &Token, params: &[Token], body: &[Stmt]) -> ExecResult {
-        let params = params.to_vec();
-        let body = body.to_vec();
-
-        let closure = self.current_scope.clone();
-        let loxfunction = Callable::lox_function(&name.lexeme, params, body, closure);
-
-        self.current_scope
-            .borrow_mut()
-            .define(name.lexeme.clone(), Literal::Callable(Rc::new(loxfunction)));
-
-        Ok(ExecSignal::None)
     }
 
     fn visit_return(&mut self, _keyword: &Token, value: Option<&Expr>) -> ExecResult {

@@ -8,7 +8,6 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
-    Function(Token, Vec<Token>, Vec<Stmt>),
     Return(Token, Option<Expr>),
     Break,
 }
@@ -30,7 +29,6 @@ pub trait Visitor<R> {
     fn visit_block(&mut self, stmts: &[Stmt]) -> R;
     fn visit_if_else(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: Option<&Stmt>) -> R;
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> R;
-    fn visit_function(&mut self, name: &Token, params: &[Token], body: &[Stmt]) -> R;
     fn visit_break(&mut self) -> R;
     fn visit_return(&mut self, keyword: &Token, value: Option<&Expr>) -> R;
 }
@@ -43,7 +41,6 @@ impl Stmt {
             Stmt::Var(name, initializer) => visitor.visit_var_stmt(name, initializer.as_ref()),
             Stmt::Block(stmts) => visitor.visit_block(stmts),
             Stmt::If(cond, then_b, else_b) => visitor.visit_if_else(cond, then_b, else_b.as_deref()),
-            Stmt::Function(name, params, body) => visitor.visit_function(name, params, body),
             Stmt::While(condition, body) => visitor.visit_while(condition, body),
             Stmt::Break => visitor.visit_break(),
             Stmt::Return(keyword, value) => visitor.visit_return(keyword, value.as_ref()),

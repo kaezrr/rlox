@@ -67,13 +67,21 @@ impl<'a> Parser<'a> {
         self.statement()
     }
 
-    /// function -> IDENTIFIER "(" parameters? ")" block
+    /// funDecl -> lambda | "fun" IDENTIFIER "(" parameters? ")" block
     fn function(&mut self, kind: &str) -> Result<Stmt, ParseError> {
-        let name = self
-            .consume(TokenType::Identifier, &format!("Expect {} name.", kind))?
-            .clone();
+        if self.advance_if(&[TokenType::Identifier]) {
+            let name = self.previous().clone();
+            let function = self.lambda(kind)?;
 
-        self.consume(TokenType::LeftParen, &format!("Expect '(' after {} name.", kind))?;
+            return Ok(Stmt::Var(name, Some(function)));
+        }
+
+        Ok(Stmt::Expression(self.lambda(kind)?))
+    }
+
+    /// function -> "fun" "(" parameters? ")" block
+    fn lambda(&mut self, kind: &str) -> Result<Expr, ParseError> {
+        self.consume(TokenType::LeftParen, &format!("Expect '(' after {}.", kind))?;
         let mut parameters = Vec::new();
 
         if !self.check(&[TokenType::RightParen]) {
@@ -92,7 +100,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block()?;
 
-        Ok(Stmt::Function(name, parameters, body))
+        Ok(Expr::Lambda(parameters, body))
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
@@ -511,7 +519,8 @@ impl<'a> Parser<'a> {
         Ok(Expr::call(callee, paren, arguments))
     }
 
-    /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER
+    /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER |
+    /// Lambda
     fn primary(&mut self) -> Result<Expr, ParseError> {
         // Literals
         let next_tokens_to_match = [
@@ -535,6 +544,10 @@ impl<'a> Parser<'a> {
 
         if self.advance_if(&[TokenType::Identifier]) {
             return Ok(Expr::Variable(self.previous().clone()));
+        }
+
+        if self.advance_if(&[TokenType::Fun]) {
+            return self.lambda("function");
         }
 
         Err(self.error(self.peek().clone(), "Expect expression."))
