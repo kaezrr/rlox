@@ -13,11 +13,13 @@ use crate::{
     token::{Literal, Token},
 };
 
+#[derive(Debug)]
 enum Kind {
     NativeFunction(NativeFunction),
     LoxFunction(LoxFunction),
 }
 
+#[derive(Debug)]
 pub struct Callable {
     pub arity: usize,
     pub name: String,
@@ -41,6 +43,7 @@ impl Callable {
     }
 }
 
+#[derive(Debug)]
 pub struct LoxFunction {
     params: Vec<Token>,
     body: Vec<Stmt>,
@@ -51,7 +54,7 @@ impl LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
         let mut local_data = HashMap::new();
         for (param, arg) in self.params.iter().zip(args) {
-            local_data.insert(param.lexeme.clone(), Some(arg));
+            local_data.insert(param.lexeme.clone(), arg);
         }
 
         let call_scope = Rc::new(RefCell::new(Scope {
@@ -63,6 +66,7 @@ impl LoxFunction {
     }
 }
 
+#[derive(Debug)]
 enum NativeFunction {
     NativeClock(NativeClock),
     ReadNumber(ReadNumber),
@@ -79,8 +83,11 @@ impl NativeFunction {
     }
 }
 
+#[derive(Debug)]
 pub struct ReadNumber;
+#[derive(Debug)]
 pub struct ReadString;
+#[derive(Debug)]
 pub struct NativeClock;
 
 impl NativeClock {

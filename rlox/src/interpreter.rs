@@ -1,16 +1,34 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    callable::Callable,
+    callable::{Callable, NativeClock, ReadNumber, ReadString},
     environment::Scope,
-    expr::{self, Expr},
+    expr::{self, Expr, ExprId},
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
 };
 
-#[derive(Default)]
 pub struct Interpreter {
     current_scope: Rc<RefCell<Scope>>,
+    locals: HashMap<ExprId, usize>,
+    globals: Rc<RefCell<Scope>>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        let mut globals = Scope::default();
+        globals.define("clock".into(), Literal::Callable(NativeClock::as_callable()));
+        globals.define("readString".into(), Literal::Callable(ReadString::as_callable()));
+        globals.define("readNumber".into(), Literal::Callable(ReadNumber::as_callable()));
+
+        let global_scope = Rc::new(RefCell::new(globals));
+
+        Self {
+            current_scope: global_scope.clone(),
+            locals: Default::default(),
+            globals: global_scope.clone(),
+        }
+    }
 }
 
 impl Interpreter {
@@ -48,6 +66,18 @@ impl Interpreter {
 
     pub fn evaluate(&mut self, expression: &Expr) -> EvalResult {
         expression.accept(self)
+    }
+
+    fn look_up_variable(&self, name: &Token, expr: &Expr) -> EvalResult {
+        let Some(&distance) = self.locals.get(&expr.id) else {
+            return self.globals.borrow().get(name);
+        };
+
+        Ok(self.current_scope.borrow().get_at(distance, name))
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.id, depth);
     }
 }
 
@@ -165,13 +195,18 @@ impl expr::Visitor<EvalResult> for Interpreter {
         }
     }
 
-    fn visit_variable(&mut self, name: &Token) -> EvalResult {
-        self.current_scope.borrow_mut().get(name)
+    fn visit_variable(&mut self, name: &Token, expr: &Expr) -> EvalResult {
+        self.look_up_variable(name, expr)
     }
 
-    fn visit_assign(&mut self, name: &Token, value: &Expr) -> EvalResult {
-        let value = self.evaluate(value)?;
-        self.current_scope.borrow_mut().assign(name, value)
+    fn visit_assign(&mut self, name: &Token, _expr: &Expr, value: &Expr) -> EvalResult {
+        let evaled = self.evaluate(value)?;
+
+        let Some(&distance) = self.locals.get(&value.id) else {
+            return self.globals.borrow_mut().assign(name, evaled);
+        };
+
+        Ok(self.current_scope.borrow_mut().assign_at(distance, name, evaled))
     }
 
     fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
@@ -271,7 +306,11 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_var_stmt(&mut self, name: &Token, initializer: Option<&Expr>) -> ExecResult {
-        let value = initializer.map(|v| self.evaluate(v)).transpose()?;
+        let value = match initializer {
+            Some(v) => self.evaluate(v)?,
+            None => Literal::Nil,
+        };
+
         self.current_scope.borrow_mut().define(name.lexeme.clone(), value);
         Ok(ExecSignal::None)
     }
@@ -321,6 +360,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 }
 
+#[derive(Debug)]
 pub struct RuntimeError {
     pub token: Token,
     pub message: String,

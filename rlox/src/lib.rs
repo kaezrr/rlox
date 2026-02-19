@@ -3,6 +3,7 @@ mod environment;
 mod expr;
 mod interpreter;
 mod parser;
+mod resolver;
 mod stmt;
 mod token;
 
@@ -11,6 +12,8 @@ use std::{io::Write, path::Path};
 use crate::{
     interpreter::{Interpreter, RuntimeError},
     parser::{ParseError, Parser},
+    resolver::{ResolveError, Resolver},
+    stmt::Stmt,
     token::{Scanner, Token, TokenType},
 };
 
@@ -70,9 +73,14 @@ impl Lox {
     fn run_repl(&mut self, tokens: &[Token]) {
         let (statements, parse_errors) = Parser::new(tokens).parse();
         if parse_errors.is_empty() {
+            if !self.resolve(&statements) {
+                return;
+            }
+
             if let Err(e) = self.interpreter.interpret(&statements) {
                 self.report_runtime_error(e);
             }
+
             return;
         }
 
@@ -82,7 +90,6 @@ impl Lox {
                 Err(e) => self.report_runtime_error(e),
             },
             Err(_) => {
-                // Original statement errors are more meaningful
                 for err in parse_errors {
                     self.report_parse_error(err);
                 }
@@ -92,19 +99,42 @@ impl Lox {
 
     fn run_script(&mut self, tokens: &[Token]) {
         let (statements, parse_errors) = Parser::new(tokens).parse();
-        if !parse_errors.is_empty() {
-            for err in parse_errors {
-                self.report_parse_error(err);
-            }
+        for err in parse_errors {
+            self.report_parse_error(err);
+        }
+
+        if self.had_error {
+            return;
+        }
+
+        if !self.resolve(&statements) {
             return;
         }
 
         if let Err(e) = self.interpreter.interpret(&statements) {
             self.report_runtime_error(e);
-        };
+        }
     }
 
+    fn resolve(&mut self, statements: &[Stmt]) -> bool {
+        for err in Resolver::new(&mut self.interpreter).resolve(statements) {
+            self.report_resolve_error(err);
+        }
+        !self.had_error
+    }
+
+    // I know both this and the resolve error are handled the same way but I am too lazy to
+    // implement a full trait and generics for this
     fn report_parse_error(&mut self, err: ParseError) {
+        let token = err.token;
+        if token.token_type == TokenType::Eof {
+            self.report(token.line, " at end", &err.message);
+        } else {
+            self.report(token.line, &format!(" at '{}'", token.lexeme), &err.message);
+        }
+    }
+
+    fn report_resolve_error(&mut self, err: ResolveError) {
         let token = err.token;
         if token.token_type == TokenType::Eof {
             self.report(token.line, " at end", &err.message);

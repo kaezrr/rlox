@@ -1,48 +1,24 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    callable::{NativeClock, ReadNumber, ReadString},
-    interpreter::RuntimeError,
+    interpreter::{EvalResult, RuntimeError},
     token::{Literal, Token},
 };
 
+#[derive(Default, Debug)]
 pub struct Scope {
-    pub values: HashMap<String, Option<Literal>>,
+    pub values: HashMap<String, Literal>,
     pub enclosing: Option<Rc<RefCell<Scope>>>,
 }
 
-impl Default for Scope {
-    fn default() -> Self {
-        let mut global = HashMap::new();
-        global.insert("clock".to_string(), Some(Literal::Callable(NativeClock::as_callable())));
-        global.insert(
-            "read_number".to_string(),
-            Some(Literal::Callable(ReadNumber::as_callable())),
-        );
-        global.insert(
-            "read_string".to_string(),
-            Some(Literal::Callable(ReadString::as_callable())),
-        );
-
-        Self {
-            values: global,
-            enclosing: None,
-        }
-    }
-}
-
 impl Scope {
-    pub fn define(&mut self, name: String, value: Option<Literal>) {
+    pub fn define(&mut self, name: String, value: Literal) {
         self.values.insert(name, value);
     }
 
-    pub fn get(&self, name: &Token) -> Result<Literal, RuntimeError> {
+    pub fn get(&self, name: &Token) -> EvalResult {
         if let Some(assigned) = self.values.get(&name.lexeme) {
-            let Some(val) = assigned else {
-                return Err(uninitialized_error(name));
-            };
-
-            return Ok(val.clone());
+            return Ok(assigned.clone());
         }
 
         if let Some(ref enclosing) = self.enclosing {
@@ -52,9 +28,22 @@ impl Scope {
         Err(undefined_error(name))
     }
 
-    pub fn assign(&mut self, name: &Token, value: Literal) -> Result<Literal, RuntimeError> {
-        if self.values.contains_key(&name.lexeme) {
-            self.values.insert(name.lexeme.clone(), Some(value.clone()));
+    pub fn get_at(&self, distance: usize, name: &Token) -> Literal {
+        if distance == 0 {
+            return self.get(name).unwrap();
+        }
+
+        self.ancestor(distance)
+            .borrow()
+            .values
+            .get(&name.lexeme)
+            .unwrap()
+            .clone()
+    }
+
+    pub fn assign(&mut self, name: &Token, value: Literal) -> EvalResult {
+        if let Some(k) = self.values.get_mut(&name.lexeme) {
+            *k = value.clone();
             return Ok(value);
         }
 
@@ -64,12 +53,34 @@ impl Scope {
 
         Err(undefined_error(name))
     }
+
+    pub fn assign_at(&mut self, distance: usize, name: &Token, value: Literal) -> Literal {
+        if distance == 0 {
+            return self.assign(name, value).unwrap();
+        }
+
+        *self
+            .ancestor(distance)
+            .borrow_mut()
+            .values
+            .get_mut(&name.lexeme)
+            .unwrap() = value.clone();
+
+        value
+    }
+
+    fn ancestor(&self, distance: usize) -> Rc<RefCell<Scope>> {
+        let mut env = self.enclosing.clone().unwrap();
+
+        for _ in 1..distance {
+            let next = env.borrow().enclosing.clone().unwrap();
+            env = next;
+        }
+
+        env
+    }
 }
 
 fn undefined_error(name: &Token) -> RuntimeError {
     RuntimeError::new(name, &format!("Undefined variable '{}'.", name.lexeme))
-}
-
-fn uninitialized_error(name: &Token) -> RuntimeError {
-    RuntimeError::new(name, &format!("Variable '{}' is not initialized.", name.lexeme))
 }

@@ -5,13 +5,13 @@ use crate::{
 
 pub type ExprId = u32;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Expr {
     pub id: ExprId,
     pub kind: ExprKind,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ExprKind {
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
@@ -72,8 +72,8 @@ pub trait Visitor<R> {
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> R;
     fn visit_comma(&mut self, left: &Expr, right: &Expr) -> R;
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> R;
-    fn visit_variable(&mut self, name: &Token) -> R;
-    fn visit_assign(&mut self, name: &Token, value: &Expr) -> R;
+    fn visit_variable(&mut self, name: &Token, expr: &Expr) -> R;
+    fn visit_assign(&mut self, name: &Token, expr: &Expr, value: &Expr) -> R;
     fn visit_call(&mut self, callee: &Expr, paren: &Token, arguments: &[Expr]) -> R;
     fn visit_lambda(&mut self, name: Option<&Token>, params: &[Token], body: &[Stmt]) -> R;
 }
@@ -88,8 +88,8 @@ impl Expr {
             ExprKind::Binary(left, operator, right) => visitor.visit_binary(left, operator, right),
             ExprKind::Logical(left, operator, right) => visitor.visit_logical(left, operator, right),
             ExprKind::Ternary(cond, left, right) => visitor.visit_ternary(cond, left, right),
-            ExprKind::Variable(name) => visitor.visit_variable(name),
-            ExprKind::Assign(name, value) => visitor.visit_assign(name, value),
+            ExprKind::Variable(name) => visitor.visit_variable(name, self),
+            ExprKind::Assign(name, value) => visitor.visit_assign(name, self, value),
             ExprKind::Call(callee, paren, arguments) => visitor.visit_call(callee, paren, arguments),
             ExprKind::Lambda(name, params, body) => visitor.visit_lambda(name.as_ref(), params, body),
         }
