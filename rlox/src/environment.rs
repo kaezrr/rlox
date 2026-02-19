@@ -6,7 +6,7 @@ use crate::{
     token::{Literal, Token},
 };
 
-type ScopeData = HashMap<String, Literal>;
+pub type ScopeData = HashMap<String, Literal>;
 
 pub struct Scope {
     environments: Vec<ScopeData>,
@@ -24,8 +24,8 @@ impl Default for Scope {
 }
 
 impl Scope {
-    pub fn push(&mut self) {
-        self.environments.push(ScopeData::default());
+    pub fn push(&mut self, env: ScopeData) {
+        self.environments.push(env);
     }
 
     pub fn pop(&mut self) {

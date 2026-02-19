@@ -110,7 +110,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Var(name, expression))
     }
 
-    /// statement -> printStmt | ifStmt | exprStmt | whileStmt | forStmt | breakStmt | block
+    /// statement -> printStmt | ifStmt | exprStmt | whileStmt | forStmt | breakStmt | returnStmt | block
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         if self.advance_if(&[TokenType::If]) {
             return self.if_statement();
@@ -132,11 +132,28 @@ impl<'a> Parser<'a> {
             return self.break_statement();
         }
 
+        if self.advance_if(&[TokenType::Return]) {
+            return self.return_statement();
+        }
+
         if self.advance_if(&[TokenType::LeftBrace]) {
             return Ok(Stmt::Block(self.block()?));
         }
 
         self.expression_statement()
+    }
+
+    /// returnStmt -> "return" expression? ";"
+    fn return_statement(&mut self) -> Result<Stmt, ParseError> {
+        let keyword = self.previous().clone();
+        let value = if !self.check(&[TokenType::Semicolon]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+
+        self.consume(TokenType::Semicolon, "Expect ';' after return value.")?;
+        Ok(Stmt::Return(keyword, value))
     }
 
     /// breakStmt -> "break" ";"

@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use crate::{
-    environment::Scope,
+    callable::Callable,
+    environment::{Scope, ScopeData},
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
@@ -22,14 +25,17 @@ impl Interpreter {
         stmt.accept(self)
     }
 
-    fn execute_block(&mut self, statements: &[Stmt]) -> ExecResult {
-        self.scope.push();
+    pub fn execute_block(&mut self, statements: &[Stmt], env: ScopeData) -> ExecResult {
+        self.scope.push(env);
 
         let result = (|| {
             for stmt in statements {
-                if let ExecSignal::Break = self.execute(stmt)? {
-                    return Ok(ExecSignal::Break);
+                let res = self.execute(stmt)?;
+                if let ExecSignal::None = res {
+                    continue;
                 }
+
+                return Ok(res);
             }
             Ok(ExecSignal::None)
         })();
@@ -63,6 +69,7 @@ pub type ExecResult = Result<ExecSignal, RuntimeError>;
 
 pub enum ExecSignal {
     None,
+    Return(Literal),
     Break,
 }
 
@@ -222,7 +229,11 @@ impl expr::Visitor<EvalResult> for Interpreter {
             ));
         }
 
-        function.call(self, args)
+        function.call(self, args).map(|x| match x {
+            ExecSignal::None => Literal::Nil,
+            ExecSignal::Return(literal) => literal,
+            _ => unreachable!(),
+        })
     }
 }
 
@@ -278,7 +289,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_block(&mut self, stmts: &[Stmt]) -> ExecResult {
-        self.execute_block(stmts)
+        self.execute_block(stmts, ScopeData::default())
     }
 
     fn visit_if_else(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: Option<&Stmt>) -> ExecResult {
@@ -308,6 +319,23 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_function(&mut self, name: &Token, params: &[Token], body: &[Stmt]) -> ExecResult {
-        todo!()
+        let params = params.to_vec();
+        let body = body.to_vec();
+
+        let loxfunction = Callable::lox_function(&name.lexeme, params, body);
+
+        self.scope
+            .define(name.lexeme.clone(), Literal::Callable(Arc::new(loxfunction)));
+
+        Ok(ExecSignal::None)
+    }
+
+    fn visit_return(&mut self, keyword: &Token, value: Option<&Expr>) -> ExecResult {
+        let value = match value {
+            Some(v) => self.evaluate(v)?,
+            None => Literal::Nil,
+        };
+
+        Ok(ExecSignal::Return(value))
     }
 }
