@@ -10,7 +10,6 @@ pub struct Parser<'a> {
     tokens: &'a [Token],
     errors: Vec<ParseError>,
     current: usize,
-    loop_depth: usize,
     id_seed: u32,
 }
 
@@ -27,7 +26,6 @@ impl<'a> Parser<'a> {
             tokens,
             errors: Vec::new(),
             current: 0,
-            loop_depth: 0,
             id_seed: 0,
         }
     }
@@ -175,10 +173,6 @@ impl<'a> Parser<'a> {
 
     /// breakStmt -> "break" ";"
     fn break_statement(&mut self) -> Result<Stmt, ParseError> {
-        if self.loop_depth == 0 {
-            return Err(self.error(self.previous().clone(), "'break' outside loop statement."));
-        }
-
         self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
         Ok(Stmt::Break)
     }
@@ -232,9 +226,7 @@ impl<'a> Parser<'a> {
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
 
-        self.loop_depth += 1;
         let body = self.statement()?;
-        self.loop_depth -= 1;
 
         Ok(Stmt::while_st(condition, body))
     }
@@ -267,9 +259,7 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::RightParen, "Expect ')' after clauses.")?;
 
-        self.loop_depth += 1;
         let mut body = self.statement()?;
-        self.loop_depth -= 1;
 
         if let Some(inc) = increment {
             body = Stmt::Block(vec![body, Stmt::Expression(inc)]);
