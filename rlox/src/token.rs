@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, rc::Rc};
 
 use crate::callable::Callable;
 
@@ -353,7 +353,7 @@ pub enum TokenType {
 
 #[derive(Clone)]
 pub enum Literal {
-    Callable(Arc<Callable>),
+    Callable(Rc<Callable>),
     Number(f64),
     String(String),
     Boolean(bool),

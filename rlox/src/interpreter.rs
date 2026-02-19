@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     callable::Callable,
-    environment::{Scope, ScopeData},
+    environment::Scope,
     expr::{self, Expr},
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Default)]
 pub struct Interpreter {
-    scope: Scope,
+    current_scope: Rc<RefCell<Scope>>,
 }
 
 impl Interpreter {
@@ -25,8 +25,9 @@ impl Interpreter {
         stmt.accept(self)
     }
 
-    pub fn execute_block(&mut self, statements: &[Stmt], env: ScopeData) -> ExecResult {
-        self.scope.push(env);
+    pub fn execute_block(&mut self, statements: &[Stmt], env: Rc<RefCell<Scope>>) -> ExecResult {
+        let previous = self.current_scope.clone();
+        self.current_scope = env;
 
         let result = (|| {
             for stmt in statements {
@@ -40,7 +41,7 @@ impl Interpreter {
             Ok(ExecSignal::None)
         })();
 
-        self.scope.pop();
+        self.current_scope = previous;
 
         result
     }
@@ -188,12 +189,12 @@ impl expr::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_variable(&mut self, name: &Token) -> EvalResult {
-        self.scope.get(name)
+        self.current_scope.borrow_mut().get(name)
     }
 
     fn visit_assign(&mut self, name: &Token, value: &Expr) -> EvalResult {
         let value = self.evaluate(value)?;
-        self.scope.assign(name, value)
+        self.current_scope.borrow_mut().assign(name, value)
     }
 
     fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
@@ -243,7 +244,7 @@ fn is_equal(left: &Literal, right: &Literal) -> bool {
         (Literal::String(a), Literal::String(b)) => a == b,
         (Literal::Boolean(a), Literal::Boolean(b)) => a == b,
         (Literal::Nil, Literal::Nil) => true,
-        (Literal::Callable(a), Literal::Callable(b)) => std::sync::Arc::ptr_eq(a, b),
+        (Literal::Callable(a), Literal::Callable(b)) => Rc::ptr_eq(a, b),
         _ => false,
     }
 }
@@ -284,12 +285,17 @@ impl stmt::Visitor<ExecResult> for Interpreter {
             None => Literal::Nil,
         };
 
-        self.scope.define(name.lexeme.clone(), value);
+        self.current_scope.borrow_mut().define(name.lexeme.clone(), value);
         Ok(ExecSignal::None)
     }
 
     fn visit_block(&mut self, stmts: &[Stmt]) -> ExecResult {
-        self.execute_block(stmts, ScopeData::default())
+        let scope = Rc::new(RefCell::new(Scope {
+            values: HashMap::new(),
+            enclosing: Some(self.current_scope.clone()),
+        }));
+
+        self.execute_block(stmts, scope)
     }
 
     fn visit_if_else(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: Option<&Stmt>) -> ExecResult {
@@ -322,15 +328,17 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         let params = params.to_vec();
         let body = body.to_vec();
 
-        let loxfunction = Callable::lox_function(&name.lexeme, params, body);
+        let closure = self.current_scope.clone();
+        let loxfunction = Callable::lox_function(&name.lexeme, params, body, closure);
 
-        self.scope
-            .define(name.lexeme.clone(), Literal::Callable(Arc::new(loxfunction)));
+        self.current_scope
+            .borrow_mut()
+            .define(name.lexeme.clone(), Literal::Callable(Rc::new(loxfunction)));
 
         Ok(ExecSignal::None)
     }
 
-    fn visit_return(&mut self, keyword: &Token, value: Option<&Expr>) -> ExecResult {
+    fn visit_return(&mut self, _keyword: &Token, value: Option<&Expr>) -> ExecResult {
         let value = match value {
             Some(v) => self.evaluate(v)?,
             None => Literal::Nil,

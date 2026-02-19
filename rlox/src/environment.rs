@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     callable::NativeClock,
@@ -6,56 +6,51 @@ use crate::{
     token::{Literal, Token},
 };
 
-pub type ScopeData = HashMap<String, Literal>;
-
 pub struct Scope {
-    environments: Vec<ScopeData>,
+    pub values: HashMap<String, Literal>,
+    pub enclosing: Option<Rc<RefCell<Scope>>>,
 }
 
 impl Default for Scope {
     fn default() -> Self {
-        let mut global = ScopeData::new();
+        let mut global = HashMap::new();
         global.insert("clock".to_string(), Literal::Callable(NativeClock::as_callable()));
 
         Self {
-            environments: vec![global],
+            values: global,
+            enclosing: None,
         }
     }
 }
 
 impl Scope {
-    pub fn push(&mut self, env: ScopeData) {
-        self.environments.push(env);
-    }
-
-    pub fn pop(&mut self) {
-        debug_assert!(self.environments.len() > 1, "attempted to pop global scope");
-        self.environments.pop();
-    }
-
     pub fn define(&mut self, name: String, value: Literal) {
-        self.environments.last_mut().unwrap().insert(name, value);
+        self.values.insert(name, value);
     }
 
     pub fn get(&self, name: &Token) -> Result<Literal, RuntimeError> {
-        for env in self.environments.iter().rev() {
-            if let Some(value) = env.get(&name.lexeme) {
-                if let Literal::Nil = *value {
-                    return Err(uninitialized_error(name));
-                }
-                return Ok(value.clone());
+        if let Some(value) = self.values.get(&name.lexeme) {
+            if let Literal::Nil = *value {
+                return Err(uninitialized_error(name));
             }
+            return Ok(value.clone());
+        }
+
+        if let Some(ref enclosing) = self.enclosing {
+            return enclosing.borrow().get(name);
         }
 
         Err(undefined_error(name))
     }
 
     pub fn assign(&mut self, name: &Token, value: Literal) -> Result<Literal, RuntimeError> {
-        for env in self.environments.iter_mut().rev() {
-            if let Some(slot) = env.get_mut(&name.lexeme) {
-                *slot = value.clone();
-                return Ok(value);
-            }
+        if self.values.contains_key(&name.lexeme) {
+            self.values.insert(name.lexeme.clone(), value.clone());
+            return Ok(value);
+        }
+
+        if let Some(ref enclosing) = self.enclosing {
+            return enclosing.borrow_mut().assign(name, value);
         }
 
         Err(undefined_error(name))

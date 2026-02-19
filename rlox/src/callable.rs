@@ -1,10 +1,12 @@
 use std::{
-    sync::Arc,
+    cell::RefCell,
+    collections::HashMap,
+    rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
-    environment::ScopeData,
+    environment::Scope,
     interpreter::{ExecResult, ExecSignal, Interpreter},
     stmt::Stmt,
     token::{Literal, Token},
@@ -29,11 +31,11 @@ impl Callable {
         }
     }
 
-    pub fn lox_function(name: &str, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+    pub fn lox_function(name: &str, params: Vec<Token>, body: Vec<Stmt>, closure: Rc<RefCell<Scope>>) -> Self {
         Self {
             arity: params.len(),
             name: format!("<fn {}>", name),
-            kind: Kind::LoxFunction(LoxFunction { params, body }),
+            kind: Kind::LoxFunction(LoxFunction { params, body, closure }),
         }
     }
 }
@@ -41,8 +43,8 @@ impl Callable {
 pub struct NativeClock;
 
 impl NativeClock {
-    pub fn as_callable() -> Arc<Callable> {
-        Arc::new(Callable {
+    pub fn as_callable() -> Rc<Callable> {
+        Rc::new(Callable {
             arity: 0,
             name: "<native fn>".to_string(),
             kind: Kind::NativeFunction(Self),
@@ -62,15 +64,21 @@ impl NativeClock {
 pub struct LoxFunction {
     params: Vec<Token>,
     body: Vec<Stmt>,
+    closure: Rc<RefCell<Scope>>,
 }
 
 impl LoxFunction {
     fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
-        let mut scope = ScopeData::new();
+        let mut local_data = HashMap::new();
         for (param, arg) in self.params.iter().zip(args) {
-            scope.insert(param.lexeme.clone(), arg);
+            local_data.insert(param.lexeme.clone(), arg);
         }
 
-        interpreter.execute_block(&self.body, scope)
+        let call_scope = Rc::new(RefCell::new(Scope {
+            values: local_data,
+            enclosing: Some(self.closure.clone()),
+        }));
+
+        interpreter.execute_block(&self.body, call_scope)
     }
 }
