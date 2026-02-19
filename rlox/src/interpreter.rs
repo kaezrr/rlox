@@ -51,29 +51,6 @@ impl Interpreter {
     }
 }
 
-pub struct RuntimeError {
-    pub token: Token,
-    pub message: String,
-}
-
-impl RuntimeError {
-    pub fn new(token: &Token, err_msg: &str) -> Self {
-        Self {
-            token: token.clone(),
-            message: err_msg.to_string(),
-        }
-    }
-}
-
-pub type EvalResult = Result<Literal, RuntimeError>;
-pub type ExecResult = Result<ExecSignal, RuntimeError>;
-
-pub enum ExecSignal {
-    None,
-    Return(Literal),
-    Break,
-}
-
 impl expr::Visitor<EvalResult> for Interpreter {
     fn visit_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
         let left = self.evaluate(left)?;
@@ -237,7 +214,7 @@ impl expr::Visitor<EvalResult> for Interpreter {
         })
     }
 
-    fn visit_anonymous_func(&mut self, name: Option<&Token>, params: &[Token], body: &[Stmt]) -> EvalResult {
+    fn visit_lambda(&mut self, name: Option<&Token>, params: &[Token], body: &[Stmt]) -> EvalResult {
         let params = params.to_vec();
         let body = body.to_vec();
 
@@ -342,4 +319,27 @@ impl stmt::Visitor<ExecResult> for Interpreter {
 
         Ok(ExecSignal::Return(value))
     }
+}
+
+pub struct RuntimeError {
+    pub token: Token,
+    pub message: String,
+}
+
+impl RuntimeError {
+    pub fn new(token: &Token, err_msg: &str) -> Self {
+        Self {
+            token: token.clone(),
+            message: err_msg.to_string(),
+        }
+    }
+}
+
+pub type EvalResult = Result<Literal, RuntimeError>;
+pub type ExecResult = Result<ExecSignal, RuntimeError>;
+
+pub enum ExecSignal {
+    None,
+    Return(Literal),
+    Break,
 }
