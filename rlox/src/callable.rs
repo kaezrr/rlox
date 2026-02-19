@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    io::stdin,
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -13,7 +14,7 @@ use crate::{
 };
 
 enum Kind {
-    NativeFunction(NativeClock),
+    NativeFunction(NativeFunction),
     LoxFunction(LoxFunction),
 }
 
@@ -26,7 +27,7 @@ pub struct Callable {
 impl Callable {
     pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
         match &self.kind {
-            Kind::NativeFunction(native_clock) => native_clock.call(),
+            Kind::NativeFunction(native_fn) => native_fn.call(),
             Kind::LoxFunction(user_function) => user_function.call(interpreter, args),
         }
     }
@@ -37,27 +38,6 @@ impl Callable {
             name: format!("<fn {}>", name),
             kind: Kind::LoxFunction(LoxFunction { params, body, closure }),
         }
-    }
-}
-
-pub struct NativeClock;
-
-impl NativeClock {
-    pub fn as_callable() -> Rc<Callable> {
-        Rc::new(Callable {
-            arity: 0,
-            name: "<native fn>".to_string(),
-            kind: Kind::NativeFunction(Self),
-        })
-    }
-
-    fn call(&self) -> ExecResult {
-        Ok(ExecSignal::Return(Literal::Number(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs_f64(),
-        )))
     }
 }
 
@@ -80,5 +60,80 @@ impl LoxFunction {
         }));
 
         interpreter.execute_block(&self.body, call_scope)
+    }
+}
+
+enum NativeFunction {
+    NativeClock(NativeClock),
+    ReadNumber(ReadNumber),
+    ReadString(ReadString),
+}
+
+impl NativeFunction {
+    pub fn call(&self) -> ExecResult {
+        match self {
+            NativeFunction::NativeClock(clock) => clock.call(),
+            NativeFunction::ReadNumber(read_num) => read_num.call(),
+            NativeFunction::ReadString(read_str) => read_str.call(),
+        }
+    }
+}
+
+pub struct ReadNumber;
+pub struct ReadString;
+pub struct NativeClock;
+
+impl NativeClock {
+    pub fn as_callable() -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: 0,
+            name: "<native fn>".to_string(),
+            kind: Kind::NativeFunction(NativeFunction::NativeClock(Self)),
+        })
+    }
+
+    fn call(&self) -> ExecResult {
+        Ok(ExecSignal::Return(Literal::Number(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs_f64(),
+        )))
+    }
+}
+
+impl ReadNumber {
+    pub fn as_callable() -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: 0,
+            name: "<native fn>".to_string(),
+            kind: Kind::NativeFunction(NativeFunction::ReadNumber(Self)),
+        })
+    }
+
+    fn call(&self) -> ExecResult {
+        Ok(ExecSignal::Return(Literal::Number({
+            let mut line = String::new();
+            stdin().read_line(&mut line).unwrap();
+            line.trim().parse().unwrap()
+        })))
+    }
+}
+
+impl ReadString {
+    pub fn as_callable() -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: 0,
+            name: "<native fn>".to_string(),
+            kind: Kind::NativeFunction(NativeFunction::ReadString(Self)),
+        })
+    }
+
+    fn call(&self) -> ExecResult {
+        Ok(ExecSignal::Return(Literal::String({
+            let mut line = String::new();
+            stdin().read_line(&mut line).unwrap();
+            line.trim_end_matches("\n").to_string()
+        })))
     }
 }
