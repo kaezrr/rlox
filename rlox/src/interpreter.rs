@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    callable::{Callable, NativeClock, ReadNumber, ReadString},
+    callable::{Callable, LoxFunction, NativeClock, ReadNumber, ReadString},
     class::LoxClass,
     environment::Scope,
     expr::{self, Expr, ExprId, ExprKind},
@@ -269,7 +269,7 @@ impl expr::Visitor<EvalResult> for Interpreter {
             return Err(RuntimeError::new(name, "Only instances have properties."));
         };
 
-        object.borrow().get(name)
+        object.borrow().get(name, object.clone())
     }
 
     fn visit_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> EvalResult {
@@ -280,6 +280,10 @@ impl expr::Visitor<EvalResult> for Interpreter {
 
         let value = self.evaluate(value)?;
         Ok(object.borrow_mut().set(name, value))
+    }
+
+    fn visit_this(&mut self, keyword: &Token, expr: &Expr) -> EvalResult {
+        self.look_up_variable(keyword, expr)
     }
 }
 
@@ -394,13 +398,11 @@ impl stmt::Visitor<ExecResult> for Interpreter {
             };
 
             if let ExprKind::Lambda(_, params, body) = &expr.kind {
-                let func = Rc::new(Callable::lox_function(
-                    &format!("{}.{}", class_name.lexeme, name.lexeme),
-                    params.to_vec(),
-                    body.to_vec(),
-                    self.current_scope.clone(),
-                ));
-
+                let func = Rc::new(LoxFunction {
+                    params: params.to_vec(),
+                    body: body.to_vec(),
+                    closure: self.current_scope.clone(),
+                });
                 methods_map.insert(name.lexeme.clone(), func);
             }
         }

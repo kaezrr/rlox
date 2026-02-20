@@ -26,6 +26,7 @@ pub enum ExprKind {
     Lambda(Option<Token>, Vec<Token>, Vec<Stmt>),
     Get(Box<Expr>, Token),
     Set(Box<Expr>, Token, Box<Expr>),
+    This(Token),
 }
 
 impl ExprKind {
@@ -88,6 +89,7 @@ pub trait Visitor<R> {
     fn visit_lambda(&mut self, name: Option<&Token>, params: &[Token], body: &[Stmt]) -> R;
     fn visit_get(&mut self, object: &Expr, name: &Token) -> R;
     fn visit_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> R;
+    fn visit_this(&mut self, keyword: &Token, expr: &Expr) -> R;
 }
 
 impl Expr {
@@ -106,6 +108,7 @@ impl Expr {
             ExprKind::Lambda(name, params, body) => visitor.visit_lambda(name.as_ref(), params, body),
             ExprKind::Get(object, name) => visitor.visit_get(object, name),
             ExprKind::Set(object, name, value) => visitor.visit_set(object, name, value),
+            ExprKind::This(keyword) => visitor.visit_this(keyword, self),
         }
     }
 }

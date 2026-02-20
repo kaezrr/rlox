@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    class::LoxClass,
+    class::{LoxClass, LoxInstance},
     environment::Scope,
     interpreter::{ExecResult, ExecSignal, Interpreter},
     stmt::Stmt,
@@ -48,12 +48,20 @@ impl Callable {
 
 #[derive(Debug)]
 pub struct LoxFunction {
-    params: Vec<Token>,
-    body: Vec<Stmt>,
-    closure: Rc<RefCell<Scope>>,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+    pub closure: Rc<RefCell<Scope>>,
 }
 
 impl LoxFunction {
+    pub fn callable_method(self, class_name: &str, name: &str) -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: self.params.len(),
+            name: format!("<fn {}.{}>", class_name, name),
+            kind: Kind::LoxFunction(self),
+        })
+    }
+
     fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
         let mut local_data = HashMap::new();
         for (param, arg) in self.params.iter().zip(args) {
@@ -66,6 +74,18 @@ impl LoxFunction {
         }));
 
         interpreter.execute_block(&self.body, call_scope)
+    }
+
+    pub fn bind(&self, instance: Rc<RefCell<LoxInstance>>) -> Self {
+        let mut scope = Scope::default();
+        scope.define("this".to_string(), Literal::Instance(instance));
+        scope.enclosing = Some(self.closure.clone());
+
+        Self {
+            params: self.params.clone(),
+            body: self.body.clone(),
+            closure: Rc::new(RefCell::new(scope)),
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
-    callable::{Callable, Kind},
+    callable::{Callable, Kind, LoxFunction},
     interpreter::{EvalResult, ExecResult, ExecSignal, Interpreter, RuntimeError},
     token::{Literal, Token},
 };
@@ -9,7 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     name: String,
-    methods: HashMap<String, Rc<Callable>>,
+    methods: HashMap<String, Rc<LoxFunction>>,
 }
 
 impl LoxClass {
@@ -21,7 +21,7 @@ impl LoxClass {
         })
     }
 
-    pub fn new(name: String, methods: HashMap<String, Rc<Callable>>) -> Self {
+    pub fn new(name: String, methods: HashMap<String, Rc<LoxFunction>>) -> Self {
         Self { name, methods }
     }
 
@@ -30,7 +30,7 @@ impl LoxClass {
         Ok(ExecSignal::Return(Literal::Instance(Rc::new(RefCell::new(instance)))))
     }
 
-    fn find_method(&self, name: &str) -> Option<Rc<Callable>> {
+    fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {
         self.methods.get(name).cloned()
     }
 }
@@ -55,12 +55,13 @@ impl LoxInstance {
         }
     }
 
-    pub fn get(&self, name: &Token) -> EvalResult {
+    pub fn get(&self, name: &Token, instance_rc: Rc<RefCell<Self>>) -> EvalResult {
         if let Some(field) = self.fields.get(&name.lexeme) {
             return Ok(field.clone());
         }
 
         if let Some(method) = self.class.find_method(&name.lexeme) {
+            let method = method.bind(instance_rc).callable_method(&self.class.name, &name.lexeme);
             return Ok(Literal::Callable(method));
         }
 

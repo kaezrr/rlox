@@ -569,6 +569,10 @@ impl<'a> Parser<'a> {
             return Ok(self.build_expr(ExprKind::grouping(expr)));
         }
 
+        if self.advance_if(&[TokenType::This]) {
+            return Ok(self.build_expr(ExprKind::This(self.previous().clone())));
+        }
+
         if self.advance_if(&[TokenType::Identifier]) {
             return Ok(self.build_expr(ExprKind::Variable(self.previous().clone())));
         }

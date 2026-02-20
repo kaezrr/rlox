@@ -4,7 +4,7 @@ use crate::{
     expr::{self, Expr, ExprKind},
     interpreter::Interpreter,
     stmt::{self, Stmt},
-    token::{Literal, Token},
+    token::{Literal, Token, TokenType},
 };
 
 #[derive(Clone, PartialEq)]
@@ -198,6 +198,10 @@ impl expr::Visitor<()> for Resolver<'_> {
         self._resolve(value);
         self._resolve(object);
     }
+
+    fn visit_this(&mut self, keyword: &Token, expr: &Expr) {
+        self.resolve_local(keyword, expr);
+    }
 }
 
 impl stmt::Visitor<()> for Resolver<'_> {
@@ -258,6 +262,14 @@ impl stmt::Visitor<()> for Resolver<'_> {
         self.declare(name);
         self.define(name);
 
+        self.begin_scope();
+
+        // Define this
+        self.scopes.last_mut().unwrap().insert(
+            Token::new(TokenType::This, "this".to_string(), None, name.line),
+            VarState::Used,
+        );
+
         for m in methods {
             let Stmt::Var(name, Some(expr)) = m else {
                 continue;
@@ -268,6 +280,8 @@ impl stmt::Visitor<()> for Resolver<'_> {
                 self.resolve_lambda(params, body, ftype);
             }
         }
+
+        self.end_scope();
     }
 }
 
