@@ -15,6 +15,12 @@ enum FunctionType {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
+enum ClassType {
+    None,
+    Class,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum VarState {
     Unintialized,
     Unused,
@@ -38,7 +44,8 @@ pub struct Resolver<'a> {
     scopes: Vec<HashMap<Token, VarState>>,
     errors: Vec<ResolveError>,
     current_function: FunctionType,
-    loop_depth: u32,
+    current_class: ClassType,
+    in_loop: bool,
 }
 
 impl<'a> Resolver<'a> {
@@ -48,7 +55,8 @@ impl<'a> Resolver<'a> {
             scopes: Default::default(),
             errors: Default::default(),
             current_function: FunctionType::None,
-            loop_depth: 0,
+            current_class: ClassType::None,
+            in_loop: false,
         }
     }
 
@@ -200,6 +208,9 @@ impl expr::Visitor<()> for Resolver<'_> {
     }
 
     fn visit_this(&mut self, keyword: &Token, expr: &Expr) {
+        if self.current_class == ClassType::None {
+            return self.error(keyword, "Can't use 'this' outside of a class.");
+        }
         self.resolve_local(keyword, expr);
     }
 }
@@ -236,14 +247,17 @@ impl stmt::Visitor<()> for Resolver<'_> {
     }
 
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) {
+        let enclosed_loop = self.in_loop;
+        self.in_loop = true;
+
         self._resolve(condition);
-        self.loop_depth += 1;
         self._resolve(body);
-        self.loop_depth -= 1;
+
+        self.in_loop = enclosed_loop;
     }
 
     fn visit_break(&mut self, keyword: &Token) {
-        if self.loop_depth == 0 {
+        if !self.in_loop {
             self.error(keyword, "Can't break outside loops.");
         }
     }
@@ -259,6 +273,9 @@ impl stmt::Visitor<()> for Resolver<'_> {
     }
 
     fn visit_class(&mut self, name: &Token, methods: &[Stmt]) {
+        let enclosing_class = self.current_class;
+        self.current_class = ClassType::Class;
+
         self.declare(name);
         self.define(name);
 
@@ -282,6 +299,8 @@ impl stmt::Visitor<()> for Resolver<'_> {
         }
 
         self.end_scope();
+
+        self.current_class = enclosing_class;
     }
 }
 
