@@ -9,7 +9,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
     Return(Token, Option<Expr>),
-    Break,
+    Break(Token),
 }
 
 impl Stmt {
@@ -29,7 +29,7 @@ pub trait Visitor<R> {
     fn visit_block(&mut self, stmts: &[Stmt]) -> R;
     fn visit_if_else(&mut self, condition: &Expr, then_branch: &Stmt, else_branch: Option<&Stmt>) -> R;
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> R;
-    fn visit_break(&mut self) -> R;
+    fn visit_break(&mut self, name: &Token) -> R;
     fn visit_return(&mut self, keyword: &Token, value: Option<&Expr>) -> R;
 }
 
@@ -42,7 +42,7 @@ impl Stmt {
             Stmt::Block(stmts) => visitor.visit_block(stmts),
             Stmt::If(cond, then_b, else_b) => visitor.visit_if_else(cond, then_b, else_b.as_deref()),
             Stmt::While(condition, body) => visitor.visit_while(condition, body),
-            Stmt::Break => visitor.visit_break(),
+            Stmt::Break(keyword) => visitor.visit_break(keyword),
             Stmt::Return(keyword, value) => visitor.visit_return(keyword, value.as_ref()),
         }
     }

@@ -345,7 +345,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         Ok(ExecSignal::None)
     }
 
-    fn visit_break(&mut self) -> ExecResult {
+    fn visit_break(&mut self, _keyword: &Token) -> ExecResult {
         Ok(ExecSignal::Break)
     }
 

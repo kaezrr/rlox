@@ -173,8 +173,9 @@ impl<'a> Parser<'a> {
 
     /// breakStmt -> "break" ";"
     fn break_statement(&mut self) -> Result<Stmt, ParseError> {
+        let keyword = self.previous().clone();
         self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
-        Ok(Stmt::Break)
+        Ok(Stmt::Break(keyword))
     }
 
     /// ifStmt -> "if" "(" expression ")" statement ("else" statement)?

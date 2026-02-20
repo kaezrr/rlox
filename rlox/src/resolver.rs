@@ -18,6 +18,7 @@ pub struct Resolver<'a> {
     scopes: Vec<HashMap<String, bool>>,
     errors: Vec<ResolveError>,
     current_function: FunctionType,
+    loop_depth: u32,
 }
 
 impl<'a> Resolver<'a> {
@@ -27,6 +28,7 @@ impl<'a> Resolver<'a> {
             scopes: Default::default(),
             errors: Default::default(),
             current_function: FunctionType::None,
+            loop_depth: 0,
         }
     }
 
@@ -189,10 +191,16 @@ impl stmt::Visitor<()> for Resolver<'_> {
 
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) {
         self._resolve(condition);
+        self.loop_depth += 1;
         self._resolve(body);
+        self.loop_depth -= 1;
     }
 
-    fn visit_break(&mut self) {}
+    fn visit_break(&mut self, keyword: &Token) {
+        if self.loop_depth == 0 {
+            self.error(keyword, "Can't break outside loops.");
+        }
+    }
 
     fn visit_return(&mut self, keyword: &Token, value: Option<&Expr>) {
         if self.current_function == FunctionType::None {
