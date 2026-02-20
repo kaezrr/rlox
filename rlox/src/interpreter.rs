@@ -44,8 +44,7 @@ impl Interpreter {
     }
 
     pub fn execute_block(&mut self, statements: &[Stmt], env: Rc<RefCell<Scope>>) -> ExecResult {
-        let previous = self.current_scope.clone();
-        self.current_scope = env;
+        let previous = std::mem::replace(&mut self.current_scope, env);
 
         let result = (|| {
             for stmt in statements {
@@ -199,10 +198,10 @@ impl expr::Visitor<EvalResult> for Interpreter {
         self.look_up_variable(name, expr)
     }
 
-    fn visit_assign(&mut self, name: &Token, _expr: &Expr, value: &Expr) -> EvalResult {
+    fn visit_assign(&mut self, name: &Token, expr: &Expr, value: &Expr) -> EvalResult {
         let evaled = self.evaluate(value)?;
 
-        let Some(&distance) = self.locals.get(&value.id) else {
+        let Some(&distance) = self.locals.get(&expr.id) else {
             return self.globals.borrow_mut().assign(name, evaled);
         };
 
