@@ -4,7 +4,7 @@ use crate::{
     callable::{Callable, NativeClock, ReadNumber, ReadString},
     class::LoxClass,
     environment::Scope,
-    expr::{self, Expr, ExprId},
+    expr::{self, Expr, ExprId, ExprKind},
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
 };
@@ -378,11 +378,35 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         Ok(ExecSignal::Return(value))
     }
 
-    fn visit_class(&mut self, name: &Token, _methods: &[Stmt]) -> ExecResult {
+    fn visit_class(&mut self, class_name: &Token, methods: &[Stmt]) -> ExecResult {
         let mut current_scope = self.current_scope.borrow_mut();
 
-        current_scope.define(name.lexeme.clone(), Literal::Nil);
-        current_scope.assign(name, Literal::Callable(LoxClass::new(name.lexeme.clone()).callable()))?;
+        current_scope.define(class_name.lexeme.clone(), Literal::Nil);
+
+        let mut methods_map = HashMap::new();
+
+        for m in methods {
+            let Stmt::Var(name, Some(expr)) = m else {
+                return Err(RuntimeError::new(
+                    class_name,
+                    "Only methods or fields allowed in class body.",
+                ));
+            };
+
+            if let ExprKind::Lambda(_, params, body) = &expr.kind {
+                let func = Rc::new(Callable::lox_function(
+                    &format!("{}.{}", class_name.lexeme, name.lexeme),
+                    params.to_vec(),
+                    body.to_vec(),
+                    self.current_scope.clone(),
+                ));
+
+                methods_map.insert(name.lexeme.clone(), func);
+            }
+        }
+
+        let class = LoxClass::new(class_name.lexeme.clone(), methods_map);
+        current_scope.assign(class_name, Literal::Callable(class.callable()))?;
 
         Ok(ExecSignal::None)
     }

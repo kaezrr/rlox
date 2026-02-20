@@ -1,16 +1,17 @@
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use crate::{
-    expr::{self, Expr},
+    expr::{self, Expr, ExprKind},
     interpreter::Interpreter,
     stmt::{self, Stmt},
     token::{Literal, Token},
 };
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum FunctionType {
     None,
     Function,
+    Method(Token),
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -117,8 +118,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_lambda(&mut self, params: &[Token], body: &[Stmt], ftype: FunctionType) {
-        let enclosing_function = self.current_function;
-        self.current_function = ftype;
+        let enclosing_function = std::mem::replace(&mut self.current_function, ftype);
 
         self.begin_scope();
         for param in params {
@@ -254,9 +254,20 @@ impl stmt::Visitor<()> for Resolver<'_> {
         }
     }
 
-    fn visit_class(&mut self, name: &Token, _methods: &[Stmt]) {
+    fn visit_class(&mut self, name: &Token, methods: &[Stmt]) {
         self.declare(name);
         self.define(name);
+
+        for m in methods {
+            let Stmt::Var(name, Some(expr)) = m else {
+                continue;
+            };
+
+            if let ExprKind::Lambda(_, params, body) = &expr.kind {
+                let ftype = FunctionType::Method(name.clone());
+                self.resolve_lambda(params, body, ftype);
+            }
+        }
     }
 }
 

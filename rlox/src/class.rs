@@ -9,6 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     name: String,
+    methods: HashMap<String, Rc<Callable>>,
 }
 
 impl LoxClass {
@@ -20,13 +21,17 @@ impl LoxClass {
         })
     }
 
-    pub fn new(name: String) -> Self {
-        Self { name }
+    pub fn new(name: String, methods: HashMap<String, Rc<Callable>>) -> Self {
+        Self { name, methods }
     }
 
     pub fn call(&self, _interpreter: &mut Interpreter, _args: Vec<Literal>) -> ExecResult {
         let instance = LoxInstance::new(self.clone());
         Ok(ExecSignal::Return(Literal::Instance(Rc::new(RefCell::new(instance)))))
+    }
+
+    fn find_method(&self, name: &str) -> Option<Rc<Callable>> {
+        self.methods.get(name).cloned()
     }
 }
 
@@ -51,7 +56,15 @@ impl LoxInstance {
     }
 
     pub fn get(&self, name: &Token) -> EvalResult {
-        self.fields.get(&name.lexeme).cloned().ok_or(RuntimeError::new(
+        if let Some(field) = self.fields.get(&name.lexeme) {
+            return Ok(field.clone());
+        }
+
+        if let Some(method) = self.class.find_method(&name.lexeme) {
+            return Ok(Literal::Callable(method));
+        }
+
+        Err(RuntimeError::new(
             name,
             &format!("Undefined property '{}'", name.lexeme),
         ))
