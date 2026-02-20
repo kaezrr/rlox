@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use crate::{
     expr::{self, Expr},
@@ -13,9 +13,28 @@ enum FunctionType {
     Function,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum VarState {
+    Unintialized,
+    Unused,
+    Used,
+}
+
+impl Hash for Token {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lexeme.hash(state);
+    }
+}
+impl Eq for Token {}
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.lexeme == other.lexeme
+    }
+}
+
 pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
-    scopes: Vec<HashMap<String, bool>>,
+    scopes: Vec<HashMap<Token, VarState>>,
     errors: Vec<ResolveError>,
     current_function: FunctionType,
     loop_depth: u32,
@@ -46,7 +65,15 @@ impl<'a> Resolver<'a> {
     }
 
     fn end_scope(&mut self) {
-        self.scopes.pop();
+        let Some(popped_scope) = self.scopes.pop() else {
+            return;
+        };
+
+        for (k, v) in popped_scope {
+            if v == VarState::Unused {
+                self.error(&k, "Unused local variable.");
+            }
+        }
     }
 
     fn error(&mut self, name: &Token, message: &str) {
@@ -60,10 +87,15 @@ impl<'a> Resolver<'a> {
         let Some(scope) = self.scopes.last_mut() else {
             return;
         };
-        if scope.contains_key(&name.lexeme) {
+
+        if scope.contains_key(name) {
             self.error(name, "Already a variable with this name in this scope.");
         }
-        self.scopes.last_mut().unwrap().insert(name.lexeme.clone(), false);
+
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .insert(name.clone(), VarState::Unintialized);
     }
 
     fn define(&mut self, name: &Token) {
@@ -71,12 +103,13 @@ impl<'a> Resolver<'a> {
             return;
         };
 
-        scope.insert(name.lexeme.clone(), true);
+        *scope.get_mut(name).unwrap() = VarState::Unused;
     }
 
     fn resolve_local(&mut self, name: &Token, expr: &Expr) {
-        for (i, scope) in self.scopes.iter().enumerate().rev() {
-            if scope.contains_key(&name.lexeme) {
+        for (i, scope) in self.scopes.iter_mut().enumerate().rev() {
+            if let Some(key) = scope.get_mut(name) {
+                *key = VarState::Used;
                 self.interpreter.resolve(expr, self.scopes.len() - i - 1);
                 return;
             }
@@ -133,9 +166,9 @@ impl expr::Visitor<()> for Resolver<'_> {
 
     fn visit_variable(&mut self, name: &Token, expr: &Expr) {
         if let Some(last) = self.scopes.last()
-            && last.get(&name.lexeme).map(|x| !x).unwrap_or_default()
+            && matches!(last.get(name), Some(VarState::Unintialized))
         {
-            self.error(name, "Can't read local variable in its own initializer.");
+            self.error(name, "Can't use uninitialized variable.");
         }
 
         self.resolve_local(name, expr);
@@ -171,8 +204,8 @@ impl stmt::Visitor<()> for Resolver<'_> {
         self.declare(name);
         if let Some(init) = initializer {
             self._resolve(init);
+            self.define(name);
         }
-        self.define(name);
     }
 
     fn visit_block(&mut self, stmts: &[Stmt]) {
