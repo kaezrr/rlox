@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use crate::{callable::Callable, class::LoxInstance};
 
@@ -354,7 +354,7 @@ pub enum TokenType {
 #[derive(Clone, Debug)]
 pub enum Literal {
     Callable(Rc<Callable>),
-    Instance(Rc<LoxInstance>),
+    Instance(Rc<RefCell<LoxInstance>>),
     Number(f64),
     String(String),
     Boolean(bool),
@@ -369,7 +369,7 @@ impl Display for Literal {
             Literal::Boolean(v) => write!(f, "{}", v),
             Literal::Nil => write!(f, "nil"),
             Literal::Callable(v) => write!(f, "{}", v.name),
-            Literal::Instance(v) => write!(f, "{}", v),
+            Literal::Instance(v) => write!(f, "{}", v.borrow()),
         }
     }
 }

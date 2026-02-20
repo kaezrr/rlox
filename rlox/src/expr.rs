@@ -24,6 +24,8 @@ pub enum ExprKind {
     Logical(Box<Expr>, Token, Box<Expr>),
     Call(Box<Expr>, Token, Vec<Expr>),
     Lambda(Option<Token>, Vec<Token>, Vec<Stmt>),
+    Get(Box<Expr>, Token),
+    Set(Box<Expr>, Token, Box<Expr>),
 }
 
 impl ExprKind {
@@ -62,6 +64,14 @@ impl ExprKind {
     pub fn call(callee: Expr, paren: Token, arguments: Vec<Expr>) -> ExprKind {
         ExprKind::Call(Box::new(callee), paren, arguments)
     }
+
+    pub fn get(object: Expr, name: Token) -> ExprKind {
+        ExprKind::Get(Box::new(object), name)
+    }
+
+    pub fn set(object: Box<Expr>, name: Token, value: Expr) -> ExprKind {
+        ExprKind::Set(object, name, Box::new(value))
+    }
 }
 
 pub trait Visitor<R> {
@@ -76,6 +86,8 @@ pub trait Visitor<R> {
     fn visit_assign(&mut self, name: &Token, expr: &Expr, value: &Expr) -> R;
     fn visit_call(&mut self, callee: &Expr, paren: &Token, arguments: &[Expr]) -> R;
     fn visit_lambda(&mut self, name: Option<&Token>, params: &[Token], body: &[Stmt]) -> R;
+    fn visit_get(&mut self, object: &Expr, name: &Token) -> R;
+    fn visit_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> R;
 }
 
 impl Expr {
@@ -92,6 +104,8 @@ impl Expr {
             ExprKind::Assign(name, value) => visitor.visit_assign(name, self, value),
             ExprKind::Call(callee, paren, arguments) => visitor.visit_call(callee, paren, arguments),
             ExprKind::Lambda(name, params, body) => visitor.visit_lambda(name.as_ref(), params, body),
+            ExprKind::Get(object, name) => visitor.visit_get(object, name),
+            ExprKind::Set(object, name, value) => visitor.visit_set(object, name, value),
         }
     }
 }

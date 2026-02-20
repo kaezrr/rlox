@@ -159,6 +159,20 @@ impl expr::Visitor<EvalResult> for Interpreter {
         }
     }
 
+    fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
+        let left = self.evaluate(left)?;
+
+        if operator.token_type == TokenType::Or {
+            if left.is_truthy() {
+                return Ok(left);
+            }
+        } else if !left.is_truthy() {
+            return Ok(left);
+        }
+
+        self.evaluate(right)
+    }
+
     fn visit_grouping(&mut self, expression: &Expr) -> EvalResult {
         self.evaluate(expression)
     }
@@ -209,20 +223,6 @@ impl expr::Visitor<EvalResult> for Interpreter {
         Ok(self.current_scope.borrow_mut().assign_at(distance, name, evaled))
     }
 
-    fn visit_logical(&mut self, left: &Expr, operator: &Token, right: &Expr) -> EvalResult {
-        let left = self.evaluate(left)?;
-
-        if operator.token_type == TokenType::Or {
-            if left.is_truthy() {
-                return Ok(left);
-            }
-        } else if !left.is_truthy() {
-            return Ok(left);
-        }
-
-        self.evaluate(right)
-    }
-
     fn visit_call(&mut self, callee: &Expr, paren: &Token, arguments: &[Expr]) -> EvalResult {
         let callee = self.evaluate(callee)?;
         let mut args = Vec::with_capacity(arguments.len());
@@ -261,6 +261,25 @@ impl expr::Visitor<EvalResult> for Interpreter {
             body,
             closure,
         ))))
+    }
+
+    fn visit_get(&mut self, object: &Expr, name: &Token) -> EvalResult {
+        let object = self.evaluate(object)?;
+        let Literal::Instance(object) = object else {
+            return Err(RuntimeError::new(name, "Only instances have properties."));
+        };
+
+        object.borrow().get(name)
+    }
+
+    fn visit_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> EvalResult {
+        let object = self.evaluate(object)?;
+        let Literal::Instance(object) = object else {
+            return Err(RuntimeError::new(name, "Only instances have properties."));
+        };
+
+        let value = self.evaluate(value)?;
+        Ok(object.borrow_mut().set(name, value))
     }
 }
 

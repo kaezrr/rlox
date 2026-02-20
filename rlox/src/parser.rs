@@ -321,7 +321,7 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// assignment -> IDENTIFIER "=" assignment | ternary
+    /// assignment -> (call ".")? IDENTIFIER "=" assignment | ternary
     fn assignment(&mut self) -> ParseExprResult {
         let expr = self.ternary()?;
 
@@ -331,6 +331,8 @@ impl<'a> Parser<'a> {
 
             if let ExprKind::Variable(name) = expr.kind {
                 return Ok(self.build_expr(ExprKind::assign(name, value)));
+            } else if let ExprKind::Get(object, name) = expr.kind {
+                return Ok(self.build_expr(ExprKind::set(object, name, value)));
             }
 
             return Err(self.error(equals, "Invalid assignment target"));
@@ -502,13 +504,18 @@ impl<'a> Parser<'a> {
         self.call()
     }
 
-    /// call -> primary ( "(" arguments? ")" )*
+    /// call -> primary ( "(" arguments? ")" | "." IDENTIFIER )*
     fn call(&mut self) -> ParseExprResult {
         let mut expr = self.primary()?;
 
         loop {
             if self.advance_if(&[TokenType::LeftParen]) {
                 expr = self.arguments(expr)?;
+            } else if self.advance_if(&[TokenType::Dot]) {
+                let name = self
+                    .consume(TokenType::Identifier, "Expect property name after '.'.")?
+                    .clone();
+                expr = self.build_expr(ExprKind::get(expr, name))
             } else {
                 break;
             }

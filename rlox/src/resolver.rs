@@ -189,6 +189,15 @@ impl expr::Visitor<()> for Resolver<'_> {
     fn visit_lambda(&mut self, _name: Option<&Token>, params: &[Token], body: &[Stmt]) {
         self.resolve_lambda(params, body, FunctionType::Function);
     }
+
+    fn visit_get(&mut self, object: &Expr, _name: &Token) {
+        self._resolve(object);
+    }
+
+    fn visit_set(&mut self, object: &Expr, _name: &Token, value: &Expr) {
+        self._resolve(value);
+        self._resolve(object);
+    }
 }
 
 impl stmt::Visitor<()> for Resolver<'_> {

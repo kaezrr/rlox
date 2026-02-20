@@ -1,9 +1,9 @@
-use std::{fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     callable::{Callable, Kind},
-    interpreter::{ExecResult, ExecSignal, Interpreter},
-    token::Literal,
+    interpreter::{EvalResult, ExecResult, ExecSignal, Interpreter, RuntimeError},
+    token::{Literal, Token},
 };
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ impl LoxClass {
 
     pub fn call(&self, _interpreter: &mut Interpreter, _args: Vec<Literal>) -> ExecResult {
         let instance = LoxInstance::new(self.clone());
-        Ok(ExecSignal::Return(Literal::Instance(Rc::new(instance))))
+        Ok(ExecSignal::Return(Literal::Instance(Rc::new(RefCell::new(instance)))))
     }
 }
 
@@ -39,16 +39,32 @@ impl Display for LoxClass {
 #[derive(Debug)]
 pub struct LoxInstance {
     class: LoxClass,
+    fields: HashMap<String, Literal>,
 }
 
 impl LoxInstance {
     pub fn new(class: LoxClass) -> Self {
-        Self { class }
+        Self {
+            class,
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, name: &Token) -> EvalResult {
+        self.fields.get(&name.lexeme).cloned().ok_or(RuntimeError::new(
+            name,
+            &format!("Undefined property '{}'", name.lexeme),
+        ))
+    }
+
+    pub fn set(&mut self, name: &Token, value: Literal) -> Literal {
+        self.fields.insert(name.lexeme.clone(), value.clone());
+        value
     }
 }
 
 impl Display for LoxInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} instance", self.class)
+        write!(f, "<instance {}>", self.class)
     }
 }
