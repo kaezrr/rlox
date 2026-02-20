@@ -82,7 +82,7 @@ impl LoxFunction {
         })
     }
 
-    fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
+    pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
         let mut local_data = HashMap::new();
         for (param, arg) in self.params.iter().zip(args) {
             local_data.insert(param.lexeme.clone(), arg);

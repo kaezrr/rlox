@@ -276,7 +276,7 @@ impl expr::Visitor<EvalResult> for Interpreter {
                 }
                 Err(RuntimeError::new(name, "Only instances have properties."))
             }
-            Literal::Instance(object) => object.borrow().get(name, object.clone()),
+            Literal::Instance(object) => object.borrow().get(name, self, object.clone()),
             _ => Err(RuntimeError::new(name, "Only instances have properties.")),
         }
     }
@@ -398,6 +398,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
 
         let mut methods_map = HashMap::new();
         let mut statics_map = HashMap::new();
+        let mut getters_map = HashMap::new();
 
         let mut arity = 0;
         for m in methods {
@@ -432,14 +433,24 @@ impl stmt::Visitor<ExecResult> for Interpreter {
                             }),
                         );
                     }
-                    expr::LambdaType::Getter => todo!(),
+                    expr::LambdaType::Getter => {
+                        getters_map.insert(
+                            name.lexeme.clone(),
+                            Rc::new(LoxFunction {
+                                params: params.to_vec(),
+                                body: body.to_vec(),
+                                closure: self.current_scope.clone(),
+                                is_initializer: false,
+                            }),
+                        );
+                    }
                 };
             } else {
                 return Err(RuntimeError::new(class_name, "Only methods allowed in class body."));
             }
         }
 
-        let class = LoxClass::new(class_name.lexeme.clone(), methods_map, statics_map);
+        let class = LoxClass::new(class_name.lexeme.clone(), methods_map, statics_map, getters_map);
         current_scope.assign(class_name, Literal::Callable(class.callable(arity)))?;
 
         Ok(ExecSignal::None)

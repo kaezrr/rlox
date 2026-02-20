@@ -11,6 +11,7 @@ pub struct LoxClass {
     pub name: String,
     methods: HashMap<String, Rc<LoxFunction>>,
     statics: HashMap<String, Rc<LoxFunction>>,
+    getters: HashMap<String, Rc<LoxFunction>>,
 }
 
 impl LoxClass {
@@ -26,8 +27,14 @@ impl LoxClass {
         name: String,
         methods: HashMap<String, Rc<LoxFunction>>,
         statics: HashMap<String, Rc<LoxFunction>>,
+        getters: HashMap<String, Rc<LoxFunction>>,
     ) -> Self {
-        Self { name, methods, statics }
+        Self {
+            name,
+            methods,
+            statics,
+            getters,
+        }
     }
 
     pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
@@ -43,6 +50,10 @@ impl LoxClass {
 
     fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {
         self.methods.get(name).cloned()
+    }
+
+    fn find_getter(&self, name: &str) -> Option<Rc<LoxFunction>> {
+        self.getters.get(name).cloned()
     }
 
     pub fn find_static(&self, name: &str) -> Option<Rc<LoxFunction>> {
@@ -70,9 +81,17 @@ impl LoxInstance {
         }
     }
 
-    pub fn get(&self, name: &Token, instance_rc: Rc<RefCell<Self>>) -> EvalResult {
+    pub fn get(&self, name: &Token, interpreter: &mut Interpreter, instance_rc: Rc<RefCell<Self>>) -> EvalResult {
         if let Some(field) = self.fields.get(&name.lexeme) {
             return Ok(field.clone());
+        }
+
+        if let Some(getter) = self.class.find_getter(&name.lexeme) {
+            let bound = getter.bind(instance_rc);
+            let ExecSignal::Return(value) = bound.call(interpreter, Vec::new())? else {
+                return Err(RuntimeError::new(name, "Getter must return a value."));
+            };
+            return Ok(value);
         }
 
         if let Some(method) = self.class.find_method(&name.lexeme) {
