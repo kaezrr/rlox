@@ -11,7 +11,7 @@ use crate::{
     environment::Scope,
     interpreter::{ExecResult, ExecSignal, Interpreter},
     stmt::Stmt,
-    token::{Literal, Token},
+    token::{Literal, Token, TokenType},
 };
 
 #[derive(Debug)]
@@ -37,11 +37,22 @@ impl Callable {
         }
     }
 
-    pub fn lox_function(name: &str, params: Vec<Token>, body: Vec<Stmt>, closure: Rc<RefCell<Scope>>) -> Self {
+    pub fn lox_function(
+        name: &str,
+        params: Vec<Token>,
+        body: Vec<Stmt>,
+        closure: Rc<RefCell<Scope>>,
+        is_initializer: bool,
+    ) -> Self {
         Self {
             arity: params.len(),
             name: format!("<fn {}>", name),
-            kind: Kind::LoxFunction(LoxFunction { params, body, closure }),
+            kind: Kind::LoxFunction(LoxFunction {
+                params,
+                body,
+                closure,
+                is_initializer,
+            }),
         }
     }
 }
@@ -51,6 +62,7 @@ pub struct LoxFunction {
     pub params: Vec<Token>,
     pub body: Vec<Stmt>,
     pub closure: Rc<RefCell<Scope>>,
+    pub is_initializer: bool,
 }
 
 impl LoxFunction {
@@ -73,7 +85,15 @@ impl LoxFunction {
             enclosing: Some(self.closure.clone()),
         }));
 
-        interpreter.execute_block(&self.body, call_scope)
+        let result = interpreter.execute_block(&self.body, call_scope)?;
+
+        if self.is_initializer {
+            let this_token = Token::new(TokenType::This, "this".to_string(), None, 1);
+            let instance = self.closure.borrow().get_at(0, &this_token);
+            return Ok(ExecSignal::Return(instance));
+        }
+
+        Ok(result)
     }
 
     pub fn bind(&self, instance: Rc<RefCell<LoxInstance>>) -> Self {
@@ -85,6 +105,7 @@ impl LoxFunction {
             params: self.params.clone(),
             body: self.body.clone(),
             closure: Rc::new(RefCell::new(scope)),
+            is_initializer: self.is_initializer,
         }
     }
 }

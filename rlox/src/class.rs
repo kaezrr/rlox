@@ -13,9 +13,9 @@ pub struct LoxClass {
 }
 
 impl LoxClass {
-    pub fn callable(self) -> Rc<Callable> {
+    pub fn callable(self, arity: usize) -> Rc<Callable> {
         Rc::new(Callable {
-            arity: 0,
+            arity,
             name: format!("<class {}>", self.name),
             kind: Kind::Class(self),
         })
@@ -25,9 +25,15 @@ impl LoxClass {
         Self { name, methods }
     }
 
-    pub fn call(&self, _interpreter: &mut Interpreter, _args: Vec<Literal>) -> ExecResult {
-        let instance = LoxInstance::new(self.clone());
-        Ok(ExecSignal::Return(Literal::Instance(Rc::new(RefCell::new(instance)))))
+    pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
+        let instance = Rc::new(RefCell::new(LoxInstance::new(self.clone())));
+
+        if let Some(initializer) = self.find_method("init") {
+            let init = initializer.bind(instance.clone()).callable_method(&self.name, "init");
+            init.call(interpreter, args)?;
+        }
+
+        Ok(ExecSignal::Return(Literal::Instance(instance)))
     }
 
     fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {

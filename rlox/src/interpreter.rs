@@ -260,6 +260,7 @@ impl expr::Visitor<EvalResult> for Interpreter {
             params,
             body,
             closure,
+            false,
         ))))
     }
 
@@ -389,26 +390,29 @@ impl stmt::Visitor<ExecResult> for Interpreter {
 
         let mut methods_map = HashMap::new();
 
+        let mut arity = 0;
         for m in methods {
             let Stmt::Var(name, Some(expr)) = m else {
-                return Err(RuntimeError::new(
-                    class_name,
-                    "Only methods or fields allowed in class body.",
-                ));
+                return Err(RuntimeError::new(class_name, "Only methods allowed in class body."));
             };
 
             if let ExprKind::Lambda(_, params, body) = &expr.kind {
+                if name.lexeme == "init" {
+                    arity = params.len();
+                }
+
                 let func = Rc::new(LoxFunction {
                     params: params.to_vec(),
                     body: body.to_vec(),
                     closure: self.current_scope.clone(),
+                    is_initializer: { name.lexeme == "init" },
                 });
                 methods_map.insert(name.lexeme.clone(), func);
             }
         }
 
         let class = LoxClass::new(class_name.lexeme.clone(), methods_map);
-        current_scope.assign(class_name, Literal::Callable(class.callable()))?;
+        current_scope.assign(class_name, Literal::Callable(class.callable(arity)))?;
 
         Ok(ExecSignal::None)
     }

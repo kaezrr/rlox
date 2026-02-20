@@ -11,6 +11,7 @@ use crate::{
 enum FunctionType {
     None,
     Function,
+    Initializer,
     Method(Token),
 }
 
@@ -268,6 +269,9 @@ impl stmt::Visitor<()> for Resolver<'_> {
         }
 
         if let Some(value) = value {
+            if self.current_function == FunctionType::Initializer {
+                self.error(keyword, "Can't return a value from an initializer.");
+            }
             self._resolve(value);
         }
     }
@@ -289,12 +293,19 @@ impl stmt::Visitor<()> for Resolver<'_> {
 
         for m in methods {
             let Stmt::Var(name, Some(expr)) = m else {
-                continue;
+                return self.error(name, "Only methods allowed in class body.");
             };
 
             if let ExprKind::Lambda(_, params, body) = &expr.kind {
-                let ftype = FunctionType::Method(name.clone());
+                let ftype = if name.lexeme == "init" {
+                    FunctionType::Initializer
+                } else {
+                    FunctionType::Method(name.clone())
+                };
+
                 self.resolve_lambda(params, body, ftype);
+            } else {
+                return self.error(name, "Only methods allowed in class body.");
             }
         }
 
