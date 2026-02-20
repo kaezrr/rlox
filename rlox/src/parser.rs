@@ -4,7 +4,8 @@ use crate::{
     token::{Literal, Token, TokenType},
 };
 
-type ParseResult = Result<Expr, ParseError>;
+type ParseExprResult = Result<Expr, ParseError>;
+type ParseStmtResult = Result<Stmt, ParseError>;
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
@@ -35,7 +36,7 @@ impl<'a> Parser<'a> {
         Expr { id: self.id_seed, kind }
     }
 
-    pub fn parse_expression(&mut self) -> ParseResult {
+    pub fn parse_expression(&mut self) -> ParseExprResult {
         self.expression()
     }
 
@@ -61,21 +62,40 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// declaration -> varDecl | funDecl | statement
-    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+    /// declaration -> varDecl | funDecl | classDecl | statement
+    fn declaration(&mut self) -> ParseStmtResult {
         if self.advance_if(&[TokenType::Var]) {
             return self.var_declaration();
         }
 
         if self.advance_if(&[TokenType::Fun]) {
-            return self.function("function");
+            return self.function_declaration("function");
+        }
+
+        if self.advance_if(&[TokenType::Class]) {
+            return self.class_declaration();
         }
 
         self.statement()
     }
 
+    /// "class" IDENTIFIER "{" function* "}"
+    fn class_declaration(&mut self) -> ParseStmtResult {
+        let name = self.consume(TokenType::Identifier, "Expect class name.")?.clone();
+        self.consume(TokenType::LeftBrace, "Expect '{' after class body")?;
+
+        let mut methods = Vec::new();
+        while !self.check(&[TokenType::RightBrace]) && !self.is_at_end() {
+            methods.push(self.function_declaration("method")?);
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
+
+        Ok(Stmt::Class(name, methods))
+    }
+
     /// funDecl -> lambda | "fun" IDENTIFIER "(" parameters? ")" block
-    fn function(&mut self, kind: &str) -> Result<Stmt, ParseError> {
+    fn function_declaration(&mut self, kind: &str) -> ParseStmtResult {
         if self.advance_if(&[TokenType::Identifier]) {
             let name = self.previous().clone();
             let function = self.lambda(Some(name.clone()), kind)?;
@@ -87,7 +107,7 @@ impl<'a> Parser<'a> {
     }
 
     /// function -> "fun" "(" parameters? ")" block
-    fn lambda(&mut self, name: Option<Token>, kind: &str) -> ParseResult {
+    fn lambda(&mut self, name: Option<Token>, kind: &str) -> ParseExprResult {
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {}.", kind))?;
         let mut parameters = Vec::new();
 
@@ -111,7 +131,7 @@ impl<'a> Parser<'a> {
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
-    fn var_declaration(&mut self) -> Result<Stmt, ParseError> {
+    fn var_declaration(&mut self) -> ParseStmtResult {
         let name = self.consume(TokenType::Identifier, "Expect variable name.")?.clone();
 
         // Uninitialized variable
@@ -126,7 +146,7 @@ impl<'a> Parser<'a> {
     }
 
     /// statement -> printStmt | ifStmt | exprStmt | whileStmt | forStmt | breakStmt | returnStmt | block
-    fn statement(&mut self) -> Result<Stmt, ParseError> {
+    fn statement(&mut self) -> ParseStmtResult {
         if self.advance_if(&[TokenType::If]) {
             return self.if_statement();
         }
@@ -159,7 +179,7 @@ impl<'a> Parser<'a> {
     }
 
     /// returnStmt -> "return" expression? ";"
-    fn return_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn return_statement(&mut self) -> ParseStmtResult {
         let keyword = self.previous().clone();
         let value = if !self.check(&[TokenType::Semicolon]) {
             Some(self.expression()?)
@@ -172,14 +192,14 @@ impl<'a> Parser<'a> {
     }
 
     /// breakStmt -> "break" ";"
-    fn break_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn break_statement(&mut self) -> ParseStmtResult {
         let keyword = self.previous().clone();
         self.consume(TokenType::Semicolon, "Expect ';' after break.")?;
         Ok(Stmt::Break(keyword))
     }
 
     /// ifStmt -> "if" "(" expression ")" statement ("else" statement)?
-    fn if_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn if_statement(&mut self) -> ParseStmtResult {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
@@ -208,21 +228,21 @@ impl<'a> Parser<'a> {
     }
 
     /// printStmt -> "print" expression ";"
-    fn print_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn print_statement(&mut self) -> ParseStmtResult {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Print(value))
     }
 
     /// exprStmt -> expression ";"
-    fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn expression_statement(&mut self) -> ParseStmtResult {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expect ';' after value.")?;
         Ok(Stmt::Expression(value))
     }
 
     /// whileStmt -> "while" "(" expression ")" statement
-    fn while_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn while_statement(&mut self) -> ParseStmtResult {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.")?;
         let condition = self.expression()?;
         self.consume(TokenType::RightParen, "Expect ')' after if condition.")?;
@@ -233,7 +253,7 @@ impl<'a> Parser<'a> {
     }
 
     /// forStmt -> "for" "(" (varDel | exprStmt | ";") expression? ";" expression? ")" statement
-    fn for_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn for_statement(&mut self) -> ParseStmtResult {
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.")?;
 
         let initializer = if self.advance_if(&[TokenType::Semicolon]) {
@@ -276,12 +296,12 @@ impl<'a> Parser<'a> {
     }
 
     /// expression -> comma
-    fn expression(&mut self) -> ParseResult {
+    fn expression(&mut self) -> ParseExprResult {
         self.comma()
     }
 
     /// comma -> assignment ("," assignment)*
-    fn comma(&mut self) -> ParseResult {
+    fn comma(&mut self) -> ParseExprResult {
         // Missing left operand
         if self.check(&[TokenType::Comma]) {
             let err = self.error(self.peek().clone(), "Expect expression before comma");
@@ -302,7 +322,7 @@ impl<'a> Parser<'a> {
     }
 
     /// assignment -> IDENTIFIER "=" assignment | ternary
-    fn assignment(&mut self) -> ParseResult {
+    fn assignment(&mut self) -> ParseExprResult {
         let expr = self.ternary()?;
 
         if self.advance_if(&[TokenType::Equal]) {
@@ -320,7 +340,7 @@ impl<'a> Parser<'a> {
     }
 
     /// ternary -> (logic_or "?" ternary ":" ternary) | logic_or
-    fn ternary(&mut self) -> ParseResult {
+    fn ternary(&mut self) -> ParseExprResult {
         // Missing left operand
         if self.check(&[TokenType::Question]) {
             let err = self.error(self.peek().clone(), "Expect condition in ternary expression");
@@ -343,7 +363,7 @@ impl<'a> Parser<'a> {
     }
 
     /// logic_or = logic_and ("or" logic_and)*
-    fn or(&mut self) -> ParseResult {
+    fn or(&mut self) -> ParseExprResult {
         let mut expr = self.and()?;
 
         while self.advance_if(&[TokenType::Or]) {
@@ -356,7 +376,7 @@ impl<'a> Parser<'a> {
     }
 
     /// logic_and = equality ("and" equality)*
-    fn and(&mut self) -> ParseResult {
+    fn and(&mut self) -> ParseExprResult {
         let mut expr = self.equality()?;
 
         while self.advance_if(&[TokenType::And]) {
@@ -369,7 +389,7 @@ impl<'a> Parser<'a> {
     }
 
     /// equality -> comparison (("==" | "!=") comparison)*
-    fn equality(&mut self) -> ParseResult {
+    fn equality(&mut self) -> ParseExprResult {
         let next_tokens_to_match = [TokenType::BangEqual, TokenType::EqualEqual];
 
         // Missing left operand
@@ -393,7 +413,7 @@ impl<'a> Parser<'a> {
     }
 
     /// comparison -> term (("> | ">=" | "<" | "<=") term)*
-    fn comparison(&mut self) -> ParseResult {
+    fn comparison(&mut self) -> ParseExprResult {
         let next_tokens_to_match = [
             TokenType::Greater,
             TokenType::GreaterEqual,
@@ -422,7 +442,7 @@ impl<'a> Parser<'a> {
     }
 
     /// term -> factor (("-" | "+") factor)*
-    fn term(&mut self) -> ParseResult {
+    fn term(&mut self) -> ParseExprResult {
         let next_tokens_to_match = [TokenType::Minus, TokenType::Plus];
 
         // Missing left operand
@@ -446,7 +466,7 @@ impl<'a> Parser<'a> {
     }
 
     /// factor -> unary (("/" | "*") unary)*
-    fn factor(&mut self) -> ParseResult {
+    fn factor(&mut self) -> ParseExprResult {
         let next_tokens_to_match = [TokenType::Slash, TokenType::Star];
 
         // Missing left operand
@@ -470,7 +490,7 @@ impl<'a> Parser<'a> {
     }
 
     /// unary -> ("!" | "-") unary | call
-    fn unary(&mut self) -> ParseResult {
+    fn unary(&mut self) -> ParseExprResult {
         let next_tokens_to_match = [TokenType::Bang, TokenType::Minus];
 
         if self.advance_if(&next_tokens_to_match) {
@@ -483,7 +503,7 @@ impl<'a> Parser<'a> {
     }
 
     /// call -> primary ( "(" arguments? ")" )*
-    fn call(&mut self) -> ParseResult {
+    fn call(&mut self) -> ParseExprResult {
         let mut expr = self.primary()?;
 
         loop {
@@ -498,7 +518,7 @@ impl<'a> Parser<'a> {
     }
 
     /// arguments -> assignment ("," assignment)*
-    fn arguments(&mut self, callee: Expr) -> ParseResult {
+    fn arguments(&mut self, callee: Expr) -> ParseExprResult {
         let mut arguments = Vec::new();
         if !self.check(&[TokenType::RightParen]) {
             arguments.push(self.assignment()?);
@@ -521,7 +541,7 @@ impl<'a> Parser<'a> {
 
     /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER |
     /// Lambda
-    fn primary(&mut self) -> ParseResult {
+    fn primary(&mut self) -> ParseExprResult {
         // Literals
         let next_tokens_to_match = [
             TokenType::True,

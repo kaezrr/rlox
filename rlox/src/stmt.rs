@@ -9,6 +9,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
     Return(Token, Option<Expr>),
+    Class(Token, Vec<Stmt>),
     Break(Token),
 }
 
@@ -31,6 +32,7 @@ pub trait Visitor<R> {
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> R;
     fn visit_break(&mut self, name: &Token) -> R;
     fn visit_return(&mut self, keyword: &Token, value: Option<&Expr>) -> R;
+    fn visit_class(&mut self, name: &Token, methods: &[Stmt]) -> R;
 }
 
 impl Stmt {
@@ -44,6 +46,7 @@ impl Stmt {
             Stmt::While(condition, body) => visitor.visit_while(condition, body),
             Stmt::Break(keyword) => visitor.visit_break(keyword),
             Stmt::Return(keyword, value) => visitor.visit_return(keyword, value.as_ref()),
+            Stmt::Class(name, methods) => visitor.visit_class(name, methods),
         }
     }
 }

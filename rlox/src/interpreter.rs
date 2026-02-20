@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     callable::{Callable, NativeClock, ReadNumber, ReadString},
+    class::LoxClass,
     environment::Scope,
     expr::{self, Expr, ExprId},
     stmt::{self, Stmt},
@@ -17,9 +18,9 @@ pub struct Interpreter {
 impl Default for Interpreter {
     fn default() -> Self {
         let mut globals = Scope::default();
-        globals.define("clock".into(), Literal::Callable(NativeClock::as_callable()));
-        globals.define("readString".into(), Literal::Callable(ReadString::as_callable()));
-        globals.define("readNumber".into(), Literal::Callable(ReadNumber::as_callable()));
+        globals.define("clock".into(), Literal::Callable(NativeClock::callable()));
+        globals.define("readString".into(), Literal::Callable(ReadString::callable()));
+        globals.define("readNumber".into(), Literal::Callable(ReadNumber::callable()));
 
         let global_scope = Rc::new(RefCell::new(globals));
 
@@ -356,6 +357,15 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         };
 
         Ok(ExecSignal::Return(value))
+    }
+
+    fn visit_class(&mut self, name: &Token, _methods: &[Stmt]) -> ExecResult {
+        let mut current_scope = self.current_scope.borrow_mut();
+
+        current_scope.define(name.lexeme.clone(), Literal::Nil);
+        current_scope.assign(name, Literal::Callable(LoxClass::new(name.lexeme.clone()).callable()))?;
+
+        Ok(ExecSignal::None)
     }
 }
 

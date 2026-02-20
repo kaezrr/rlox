@@ -1,6 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::callable::Callable;
+use crate::{callable::Callable, class::LoxInstance};
 
 pub struct Scanner {
     source: Vec<u8>,
@@ -354,6 +354,7 @@ pub enum TokenType {
 #[derive(Clone, Debug)]
 pub enum Literal {
     Callable(Rc<Callable>),
+    Instance(Rc<LoxInstance>),
     Number(f64),
     String(String),
     Boolean(bool),
@@ -368,6 +369,7 @@ impl Display for Literal {
             Literal::Boolean(v) => write!(f, "{}", v),
             Literal::Nil => write!(f, "nil"),
             Literal::Callable(v) => write!(f, "{}", v.name),
+            Literal::Instance(v) => write!(f, "{}", v),
         }
     }
 }

@@ -244,6 +244,11 @@ impl stmt::Visitor<()> for Resolver<'_> {
             self._resolve(value);
         }
     }
+
+    fn visit_class(&mut self, name: &Token, _methods: &[Stmt]) {
+        self.declare(name);
+        self.define(name);
+    }
 }
 
 trait Resolve {

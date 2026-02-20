@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    class::LoxClass,
     environment::Scope,
     interpreter::{ExecResult, ExecSignal, Interpreter},
     stmt::Stmt,
@@ -14,16 +15,17 @@ use crate::{
 };
 
 #[derive(Debug)]
-enum Kind {
+pub enum Kind {
     NativeFunction(NativeFunction),
     LoxFunction(LoxFunction),
+    Class(LoxClass),
 }
 
 #[derive(Debug)]
 pub struct Callable {
     pub arity: usize,
     pub name: String,
-    kind: Kind,
+    pub kind: Kind,
 }
 
 impl Callable {
@@ -31,6 +33,7 @@ impl Callable {
         match &self.kind {
             Kind::NativeFunction(native_fn) => native_fn.call(),
             Kind::LoxFunction(user_function) => user_function.call(interpreter, args),
+            Kind::Class(class) => class.call(interpreter, args),
         }
     }
 
@@ -67,7 +70,7 @@ impl LoxFunction {
 }
 
 #[derive(Debug)]
-enum NativeFunction {
+pub enum NativeFunction {
     NativeClock(NativeClock),
     ReadNumber(ReadNumber),
     ReadString(ReadString),
@@ -91,7 +94,7 @@ pub struct ReadString;
 pub struct NativeClock;
 
 impl NativeClock {
-    pub fn as_callable() -> Rc<Callable> {
+    pub fn callable() -> Rc<Callable> {
         Rc::new(Callable {
             arity: 0,
             name: "<native fn>".to_string(),
@@ -110,7 +113,7 @@ impl NativeClock {
 }
 
 impl ReadNumber {
-    pub fn as_callable() -> Rc<Callable> {
+    pub fn callable() -> Rc<Callable> {
         Rc::new(Callable {
             arity: 0,
             name: "<native fn>".to_string(),
@@ -128,7 +131,7 @@ impl ReadNumber {
 }
 
 impl ReadString {
-    pub fn as_callable() -> Rc<Callable> {
+    pub fn callable() -> Rc<Callable> {
         Rc::new(Callable {
             arity: 0,
             name: "<native fn>".to_string(),
