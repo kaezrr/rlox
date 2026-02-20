@@ -1,5 +1,5 @@
 use crate::{
-    expr::{Expr, ExprKind},
+    expr::{Expr, ExprKind, LambdaType},
     stmt::Stmt,
     token::{Literal, Token, TokenType},
 };
@@ -69,7 +69,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.advance_if(&[TokenType::Fun]) {
-            return self.function_declaration("function");
+            return self.function_declaration("function", LambdaType::Function);
         }
 
         if self.advance_if(&[TokenType::Class]) {
@@ -79,14 +79,21 @@ impl<'a> Parser<'a> {
         self.statement()
     }
 
-    /// "class" IDENTIFIER "{" function* "}"
+    /// "class" IDENTIFIER "{" (function | staticFunction)* "}"
     fn class_declaration(&mut self) -> ParseStmtResult {
         let name = self.consume(TokenType::Identifier, "Expect class name.")?.clone();
         self.consume(TokenType::LeftBrace, "Expect '{' after class body")?;
 
         let mut methods = Vec::new();
         while !self.check(&[TokenType::RightBrace]) && !self.is_at_end() {
-            methods.push(self.function_declaration("method")?);
+            if self.advance_if(&[TokenType::Class]) {
+                if !self.check(&[TokenType::Identifier]) {
+                    return Err(self.error(self.peek().clone(), "Expect static method name."));
+                }
+                methods.push(self.function_declaration("static method", LambdaType::ClassStatic)?);
+            } else {
+                methods.push(self.function_declaration("method", LambdaType::Function)?);
+            }
         }
 
         self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
@@ -95,19 +102,19 @@ impl<'a> Parser<'a> {
     }
 
     /// funDecl -> lambda | "fun" IDENTIFIER "(" parameters? ")" block
-    fn function_declaration(&mut self, kind: &str) -> ParseStmtResult {
+    fn function_declaration(&mut self, kind: &str, lambda_type: LambdaType) -> ParseStmtResult {
         if self.advance_if(&[TokenType::Identifier]) {
             let name = self.previous().clone();
-            let function = self.lambda(Some(name.clone()), kind)?;
+            let function = self.lambda(Some(name.clone()), kind, lambda_type)?;
 
             return Ok(Stmt::Var(name, Some(function)));
         }
 
-        Ok(Stmt::Expression(self.lambda(None, kind)?))
+        Ok(Stmt::Expression(self.lambda(None, kind, lambda_type)?))
     }
 
     /// function -> "fun" "(" parameters? ")" block
-    fn lambda(&mut self, name: Option<Token>, kind: &str) -> ParseExprResult {
+    fn lambda(&mut self, name: Option<Token>, kind: &str, lambda_type: LambdaType) -> ParseExprResult {
         self.consume(TokenType::LeftParen, &format!("Expect '(' after {}.", kind))?;
         let mut parameters = Vec::new();
 
@@ -127,7 +134,7 @@ impl<'a> Parser<'a> {
 
         let body = self.block()?;
 
-        Ok(self.build_expr(ExprKind::Lambda(name, parameters, body)))
+        Ok(self.build_expr(ExprKind::Lambda(name, parameters, body, lambda_type)))
     }
 
     /// varDecl -> "var" IDENTIFIER ("=" expression)? ";"
@@ -578,7 +585,7 @@ impl<'a> Parser<'a> {
         }
 
         if self.advance_if(&[TokenType::Fun]) {
-            return self.lambda(None, "function");
+            return self.lambda(None, "function", LambdaType::Function);
         }
 
         Err(self.error(self.peek().clone(), "Expect expression."))

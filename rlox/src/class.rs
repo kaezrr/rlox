@@ -8,8 +8,9 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
-    name: String,
+    pub name: String,
     methods: HashMap<String, Rc<LoxFunction>>,
+    statics: HashMap<String, Rc<LoxFunction>>,
 }
 
 impl LoxClass {
@@ -21,8 +22,12 @@ impl LoxClass {
         })
     }
 
-    pub fn new(name: String, methods: HashMap<String, Rc<LoxFunction>>) -> Self {
-        Self { name, methods }
+    pub fn new(
+        name: String,
+        methods: HashMap<String, Rc<LoxFunction>>,
+        statics: HashMap<String, Rc<LoxFunction>>,
+    ) -> Self {
+        Self { name, methods, statics }
     }
 
     pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
@@ -38,6 +43,10 @@ impl LoxClass {
 
     fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {
         self.methods.get(name).cloned()
+    }
+
+    pub fn find_static(&self, name: &str) -> Option<Rc<LoxFunction>> {
+        self.statics.get(name).cloned()
     }
 }
 

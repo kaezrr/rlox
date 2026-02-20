@@ -57,7 +57,7 @@ impl Callable {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoxFunction {
     pub params: Vec<Token>,
     pub body: Vec<Stmt>,
@@ -66,11 +66,19 @@ pub struct LoxFunction {
 }
 
 impl LoxFunction {
-    pub fn callable_method(self, class_name: &str, name: &str) -> Rc<Callable> {
+    pub fn callable_method(&self, class_name: &str, name: &str) -> Rc<Callable> {
         Rc::new(Callable {
             arity: self.params.len(),
             name: format!("<fn {}.{}>", class_name, name),
-            kind: Kind::LoxFunction(self),
+            kind: Kind::LoxFunction(self.clone()),
+        })
+    }
+
+    pub fn callable_static(&self, class_name: &str, name: &str) -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: self.params.len(),
+            name: format!("<fn static {}.{}>", class_name, name),
+            kind: Kind::LoxFunction(self.clone()),
         })
     }
 

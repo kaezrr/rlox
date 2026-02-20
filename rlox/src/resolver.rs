@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 use crate::{
-    expr::{self, Expr, ExprKind},
+    expr::{self, Expr, ExprKind, LambdaType},
     interpreter::Interpreter,
     stmt::{self, Stmt},
     token::{Literal, Token, TokenType},
@@ -47,6 +47,7 @@ pub struct Resolver<'a> {
     current_function: FunctionType,
     current_class: ClassType,
     in_loop: bool,
+    in_static: bool,
 }
 
 impl<'a> Resolver<'a> {
@@ -58,6 +59,7 @@ impl<'a> Resolver<'a> {
             current_function: FunctionType::None,
             current_class: ClassType::None,
             in_loop: false,
+            in_static: false,
         }
     }
 
@@ -212,6 +214,11 @@ impl expr::Visitor<()> for Resolver<'_> {
         if self.current_class == ClassType::None {
             return self.error(keyword, "Can't use 'this' outside of a class.");
         }
+
+        if self.in_static {
+            return self.error(keyword, "Can't use 'this' inside static functions.");
+        }
+
         self.resolve_local(keyword, expr);
     }
 }
@@ -296,14 +303,19 @@ impl stmt::Visitor<()> for Resolver<'_> {
                 return self.error(name, "Only methods allowed in class body.");
             };
 
-            if let ExprKind::Lambda(_, params, body) = &expr.kind {
+            if let ExprKind::Lambda(_, params, body, lambda_type) = &expr.kind {
                 let ftype = if name.lexeme == "init" {
                     FunctionType::Initializer
                 } else {
                     FunctionType::Method(name.clone())
                 };
 
+                let previous = self.in_static;
+                self.in_static = *lambda_type == LambdaType::ClassStatic;
+
                 self.resolve_lambda(params, body, ftype);
+
+                self.in_static = previous;
             } else {
                 return self.error(name, "Only methods allowed in class body.");
             }

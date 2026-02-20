@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    callable::{Callable, LoxFunction, NativeClock, ReadNumber, ReadString},
+    callable::{Callable, Kind, LoxFunction, NativeClock, ReadNumber, ReadString},
     class::LoxClass,
     environment::Scope,
     expr::{self, Expr, ExprId, ExprKind},
@@ -265,12 +265,20 @@ impl expr::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_get(&mut self, object: &Expr, name: &Token) -> EvalResult {
-        let object = self.evaluate(object)?;
-        let Literal::Instance(object) = object else {
-            return Err(RuntimeError::new(name, "Only instances have properties."));
-        };
-
-        object.borrow().get(name, object.clone())
+        match self.evaluate(object)? {
+            Literal::Callable(x) => {
+                if let Kind::Class(class) = &x.kind {
+                    if let Some(f) = class.find_static(&name.lexeme) {
+                        return Ok(Literal::Callable(f.callable_static(&class.name, &name.lexeme)));
+                    } else {
+                        return Err(RuntimeError::new(name, "Undefined static property."));
+                    }
+                }
+                Err(RuntimeError::new(name, "Only instances have properties."))
+            }
+            Literal::Instance(object) => object.borrow().get(name, object.clone()),
+            _ => Err(RuntimeError::new(name, "Only instances have properties.")),
+        }
     }
 
     fn visit_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> EvalResult {
@@ -389,6 +397,7 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         current_scope.define(class_name.lexeme.clone(), Literal::Nil);
 
         let mut methods_map = HashMap::new();
+        let mut statics_map = HashMap::new();
 
         let mut arity = 0;
         for m in methods {
@@ -396,22 +405,41 @@ impl stmt::Visitor<ExecResult> for Interpreter {
                 return Err(RuntimeError::new(class_name, "Only methods allowed in class body."));
             };
 
-            if let ExprKind::Lambda(_, params, body) = &expr.kind {
-                if name.lexeme == "init" {
-                    arity = params.len();
-                }
-
-                let func = Rc::new(LoxFunction {
-                    params: params.to_vec(),
-                    body: body.to_vec(),
-                    closure: self.current_scope.clone(),
-                    is_initializer: { name.lexeme == "init" },
-                });
-                methods_map.insert(name.lexeme.clone(), func);
+            if let ExprKind::Lambda(_, params, body, lambda_type) = &expr.kind {
+                match lambda_type {
+                    expr::LambdaType::ClassStatic => {
+                        statics_map.insert(
+                            name.lexeme.clone(),
+                            Rc::new(LoxFunction {
+                                params: params.to_vec(),
+                                body: body.to_vec(),
+                                closure: self.current_scope.clone(),
+                                is_initializer: false,
+                            }),
+                        );
+                    }
+                    expr::LambdaType::Function => {
+                        if name.lexeme == "init" {
+                            arity = params.len();
+                        }
+                        methods_map.insert(
+                            name.lexeme.clone(),
+                            Rc::new(LoxFunction {
+                                params: params.to_vec(),
+                                body: body.to_vec(),
+                                closure: self.current_scope.clone(),
+                                is_initializer: name.lexeme == "init",
+                            }),
+                        );
+                    }
+                    expr::LambdaType::Getter => todo!(),
+                };
+            } else {
+                return Err(RuntimeError::new(class_name, "Only methods allowed in class body."));
             }
         }
 
-        let class = LoxClass::new(class_name.lexeme.clone(), methods_map);
+        let class = LoxClass::new(class_name.lexeme.clone(), methods_map, statics_map);
         current_scope.assign(class_name, Literal::Callable(class.callable(arity)))?;
 
         Ok(ExecSignal::None)

@@ -11,6 +11,13 @@ pub struct Expr {
     pub kind: ExprKind,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LambdaType {
+    ClassStatic,
+    Function,
+    Getter,
+}
+
 #[derive(Clone, Debug)]
 pub enum ExprKind {
     Binary(Box<Expr>, Token, Box<Expr>),
@@ -23,7 +30,7 @@ pub enum ExprKind {
     Assign(Token, Box<Expr>),
     Logical(Box<Expr>, Token, Box<Expr>),
     Call(Box<Expr>, Token, Vec<Expr>),
-    Lambda(Option<Token>, Vec<Token>, Vec<Stmt>),
+    Lambda(Option<Token>, Vec<Token>, Vec<Stmt>, LambdaType),
     Get(Box<Expr>, Token),
     Set(Box<Expr>, Token, Box<Expr>),
     This(Token),
@@ -105,7 +112,7 @@ impl Expr {
             ExprKind::Variable(name) => visitor.visit_variable(name, self),
             ExprKind::Assign(name, value) => visitor.visit_assign(name, self, value),
             ExprKind::Call(callee, paren, arguments) => visitor.visit_call(callee, paren, arguments),
-            ExprKind::Lambda(name, params, body) => visitor.visit_lambda(name.as_ref(), params, body),
+            ExprKind::Lambda(name, params, body, _) => visitor.visit_lambda(name.as_ref(), params, body),
             ExprKind::Get(object, name) => visitor.visit_get(object, name),
             ExprKind::Set(object, name, value) => visitor.visit_set(object, name, value),
             ExprKind::This(keyword) => visitor.visit_this(keyword, self),
