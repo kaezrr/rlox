@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    callable::{Callable, Kind, LenArray, LoxFunction, NativeClock, PopArray, PushArray, ReadNumber, ReadString},
+    callable::{Callable, ConvertToNumber, Kind, LenArray, LoxFunction, NativeClock, PopArray, PushArray, ReadString},
     class::LoxClass,
     environment::Scope,
     expr::{self, Expr, ExprId, ExprKind},
@@ -19,8 +19,8 @@ impl Default for Interpreter {
     fn default() -> Self {
         let mut globals = Scope::default();
         globals.define("clock".into(), Literal::Callable(NativeClock::callable()));
-        globals.define("readString".into(), Literal::Callable(ReadString::callable()));
-        globals.define("readNumber".into(), Literal::Callable(ReadNumber::callable()));
+        globals.define("input".into(), Literal::Callable(ReadString::callable()));
+        globals.define("number".into(), Literal::Callable(ConvertToNumber::callable()));
         globals.define("push".into(), Literal::Callable(PushArray::callable()));
         globals.define("pop".into(), Literal::Callable(PopArray::callable()));
         globals.define("len".into(), Literal::Callable(LenArray::callable()));

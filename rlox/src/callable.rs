@@ -121,8 +121,8 @@ impl LoxFunction {
 #[derive(Debug)]
 pub enum NativeFunction {
     NativeClock(NativeClock),
-    ReadNumber(ReadNumber),
     ReadString(ReadString),
+    ConvertToNumber(ConvertToNumber),
     PushArray(PushArray),
     PopArray(PopArray),
     LenArray(LenArray),
@@ -132,8 +132,8 @@ impl NativeFunction {
     pub fn call(&self, paren: &Token, args: &[Literal]) -> ExecResult {
         match self {
             NativeFunction::NativeClock(clock) => clock.call(),
-            NativeFunction::ReadNumber(read_num) => read_num.call(),
             NativeFunction::ReadString(read_str) => read_str.call(),
+            NativeFunction::ConvertToNumber(read_num) => read_num.call(paren, args),
             NativeFunction::PushArray(push_array) => push_array.call(paren, args),
             NativeFunction::PopArray(pop_array) => pop_array.call(paren, args),
             NativeFunction::LenArray(len_array) => len_array.call(paren, args),
@@ -142,7 +142,7 @@ impl NativeFunction {
 }
 
 #[derive(Debug)]
-pub struct ReadNumber;
+pub struct ConvertToNumber;
 #[derive(Debug)]
 pub struct ReadString;
 #[derive(Debug)]
@@ -174,21 +174,26 @@ impl NativeClock {
     }
 }
 
-impl ReadNumber {
+impl ConvertToNumber {
     pub fn callable() -> Rc<Callable> {
         Rc::new(Callable {
-            arity: 0,
+            arity: 1,
             name: "<native fn>".to_string(),
-            kind: Kind::NativeFunction(NativeFunction::ReadNumber(Self)),
+            kind: Kind::NativeFunction(NativeFunction::ConvertToNumber(Self)),
         })
     }
 
-    fn call(&self) -> ExecResult {
-        Ok(ExecSignal::Return(Literal::Number({
-            let mut line = String::new();
-            stdin().read_line(&mut line).unwrap();
-            line.trim().parse().unwrap()
-        })))
+    fn call(&self, paren: &Token, args: &[Literal]) -> ExecResult {
+        let literal = args[0].to_string();
+
+        let Ok(number) = literal.parse::<f64>() else {
+            return Err(RuntimeError::new(
+                paren,
+                &format!("Cannot convert '{}' to a number.", literal),
+            ));
+        };
+
+        Ok(ExecSignal::Return(Literal::Number(number)))
     }
 }
 

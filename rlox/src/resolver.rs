@@ -7,39 +7,7 @@ use crate::{
     token::{Literal, Token, TokenType},
 };
 
-#[derive(Clone, PartialEq)]
-enum FunctionType {
-    None,
-    Function,
-    Initializer,
-    Method(Token),
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum ClassType {
-    None,
-    Class,
-    SubClass,
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum VarState {
-    Unintialized,
-    Unused,
-    Used,
-}
-
-impl Hash for Token {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.lexeme.hash(state);
-    }
-}
-impl Eq for Token {}
-impl PartialEq for Token {
-    fn eq(&self, other: &Self) -> bool {
-        self.lexeme == other.lexeme
-    }
-}
+pub const NATIVE_NAMES: [&str; 6] = ["clock", "input", "number", "push", "pop", "len"];
 
 pub struct Resolver<'a> {
     interpreter: &'a mut Interpreter,
@@ -64,8 +32,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub fn resolve(mut self, stmts: &[Stmt]) -> Vec<ResolveError> {
-        self._resolve(stmts);
+    pub fn resolve<R: Resolve + ?Sized + Debug>(mut self, thing: &R) -> Vec<ResolveError> {
+        self._resolve(thing);
         self.errors
     }
 
@@ -182,6 +150,11 @@ impl expr::Visitor<()> for Resolver<'_> {
     }
 
     fn visit_assign(&mut self, name: &Token, expr: &Expr, value: &Expr) {
+        if NATIVE_NAMES.contains(&name.lexeme.as_str()) {
+            self.error(name, "Cannot redefine native function.");
+            return;
+        }
+
         self._resolve(value);
         self.resolve_local(name, expr);
     }
@@ -252,6 +225,11 @@ impl stmt::Visitor<()> for Resolver<'_> {
     }
 
     fn visit_var_stmt(&mut self, name: &Token, initializer: Option<&Expr>) {
+        if NATIVE_NAMES.contains(&name.lexeme.as_str()) {
+            self.error(name, "Cannot redefine native function.");
+            return;
+        }
+
         self.declare(name);
         if let Some(init) = initializer {
             self._resolve(init);
@@ -371,7 +349,7 @@ impl stmt::Visitor<()> for Resolver<'_> {
     }
 }
 
-trait Resolve {
+pub trait Resolve {
     fn resolve(&self, resolver: &mut Resolver);
 }
 
@@ -398,4 +376,38 @@ impl Resolve for [Stmt] {
 pub struct ResolveError {
     pub token: Token,
     pub message: String,
+}
+
+#[derive(Clone, PartialEq)]
+enum FunctionType {
+    None,
+    Function,
+    Initializer,
+    Method(Token),
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum ClassType {
+    None,
+    Class,
+    SubClass,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum VarState {
+    Unintialized,
+    Unused,
+    Used,
+}
+
+impl Hash for Token {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.lexeme.hash(state);
+    }
+}
+impl Eq for Token {}
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.lexeme == other.lexeme
+    }
 }

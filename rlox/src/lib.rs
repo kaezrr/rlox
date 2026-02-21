@@ -8,14 +8,13 @@ mod resolver;
 mod stmt;
 mod token;
 
-use std::{io::Write, path::Path};
+use std::{fmt::Debug, io::Write, path::Path};
 
 use crate::{
     interpreter::{Interpreter, RuntimeError},
     parser::{ParseError, Parser},
-    resolver::{ResolveError, Resolver},
-    stmt::Stmt,
-    token::{Scanner, Token, TokenType},
+    resolver::{Resolve, ResolveError, Resolver},
+    token::{Literal, Scanner, Token, TokenType},
 };
 
 #[derive(Default)]
@@ -74,7 +73,7 @@ impl Lox {
     fn run_repl(&mut self, tokens: &[Token]) {
         let (statements, parse_errors) = Parser::new(tokens).parse();
         if parse_errors.is_empty() {
-            if !self.resolve(&statements) {
+            if !self.resolve(statements.as_slice()) {
                 return;
             }
 
@@ -86,10 +85,17 @@ impl Lox {
         }
 
         match Parser::new(tokens).parse_expression() {
-            Ok(expr) => match self.interpreter.evaluate(&expr) {
-                Ok(value) => eprintln!("{value}"),
-                Err(e) => self.report_runtime_error(e),
-            },
+            Ok(expr) => {
+                if !self.resolve(&expr) {
+                    return;
+                }
+                match self.interpreter.evaluate(&expr) {
+                    Ok(Literal::String(value)) => eprintln!("\"{value}\""),
+                    Ok(value) => eprintln!("{value}"),
+                    Err(e) => self.report_runtime_error(e),
+                }
+            }
+
             Err(_) => {
                 for err in parse_errors {
                     self.report_parse_error(err);
@@ -108,7 +114,7 @@ impl Lox {
             return;
         }
 
-        if !self.resolve(&statements) {
+        if !self.resolve(statements.as_slice()) {
             return;
         }
 
@@ -117,8 +123,8 @@ impl Lox {
         }
     }
 
-    fn resolve(&mut self, statements: &[Stmt]) -> bool {
-        for err in Resolver::new(&mut self.interpreter).resolve(statements) {
+    fn resolve<R: Resolve + Debug + ?Sized>(&mut self, thing: &R) -> bool {
+        for err in Resolver::new(&mut self.interpreter).resolve(thing) {
             self.report_resolve_error(err);
         }
         !self.had_error
