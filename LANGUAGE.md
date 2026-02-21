@@ -34,6 +34,7 @@ This is the language reference for Lox as implemented in `rlox`. For a general i
 | `-`         | Subtraction               |
 | `*`         | Multiplication            |
 | `/`         | Division                  |
+| `%`         | Modulo                    |
 | `-` (unary) | Negation                  |
 
 ### Comparison
@@ -107,7 +108,7 @@ logic_and      -> equality ( "and" equality )* ;
 equality       -> comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           -> factor ( ( "-" | "+" ) factor )* ;
-factor         -> unary ( ( "/" | "*" ) unary )* ;
+factor         -> unary ( ( "/" | "*" | "%" ) unary )* ;
 unary          -> ( "!" | "-" ) unary | call ;
 call           -> primary ( "(" arguments? ")" | "." IDENTIFIER | "[" expression "]" )* ;
 primary        -> NUMBER | STRING | "true" | "false" | "nil"

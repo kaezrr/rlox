@@ -110,6 +110,11 @@ impl expr::Visitor<EvalResult> for Interpreter {
                 Ok(Literal::Number(left * right))
             }
 
+            TokenType::Percent => {
+                let (left, right) = check_number_operands(operator, &left, &right)?;
+                Ok(Literal::Number(left % right))
+            }
+
             TokenType::Plus => match (left, right) {
                 (Literal::Number(left), Literal::Number(right)) => Ok(Literal::Number(left + right)),
                 (Literal::String(left), Literal::String(right)) => Ok(Literal::String(left + &right)),

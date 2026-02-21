@@ -473,9 +473,9 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// factor -> unary (("/" | "*") unary)*
+    /// factor -> unary (("/" | "*" | "%") unary)*
     fn factor(&mut self) -> ParseExprResult {
-        let next_tokens_to_match = [TokenType::Slash, TokenType::Star];
+        let next_tokens_to_match = [TokenType::Slash, TokenType::Star, TokenType::Percent];
 
         // Missing left operand
         if self.check(&next_tokens_to_match) {

@@ -72,6 +72,7 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus),
             ';' => self.add_token(TokenType::Semicolon),
             '*' => self.add_token(TokenType::Star),
+            '%' => self.add_token(TokenType::Percent),
             '?' => self.add_token(TokenType::Question),
             ':' => self.add_token(TokenType::Colon),
 
@@ -310,6 +311,7 @@ pub enum TokenType {
     Comma,
     Dot,
     Minus,
+    Percent,
     Plus,
     Semicolon,
     Slash,
