@@ -197,11 +197,6 @@ impl expr::Visitor<EvalResult> for Interpreter {
         }
     }
 
-    fn visit_comma(&mut self, left: &Expr, right: &Expr) -> EvalResult {
-        let _ = self.evaluate(left)?;
-        self.evaluate(right)
-    }
-
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> EvalResult {
         let condition = self.evaluate(cond)?.is_truthy();
 
@@ -341,12 +336,46 @@ impl expr::Visitor<EvalResult> for Interpreter {
         Ok(Literal::List(Rc::new(RefCell::new(list))))
     }
 
-    fn visit_index(&mut self, list: &Expr, index: &Expr) -> EvalResult {
-        todo!()
+    fn visit_index(&mut self, list: &Expr, index: &Expr, paren: &Token) -> EvalResult {
+        let Literal::List(list) = self.evaluate(list)? else {
+            return Err(RuntimeError::new(paren, "Can only index lists."));
+        };
+
+        let Literal::Number(index) = self.evaluate(index)? else {
+            return Err(RuntimeError::new(paren, "List index must be a number."));
+        };
+
+        if index.fract() != 0.0 || index.is_sign_negative() {
+            return Err(RuntimeError::new(paren, "List index must be a positive integer."));
+        }
+
+        let i = index as usize;
+        if let Some(value) = list.borrow().get(i) {
+            return Ok(value.clone());
+        };
+        Err(RuntimeError::new(paren, "List index out of bounds."))
     }
 
-    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr) -> EvalResult {
-        todo!()
+    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr, paren: &Token) -> EvalResult {
+        let Literal::List(list) = self.evaluate(list)? else {
+            return Err(RuntimeError::new(paren, "Can only index lists."));
+        };
+
+        let Literal::Number(index) = self.evaluate(index)? else {
+            return Err(RuntimeError::new(paren, "List index must be a number."));
+        };
+
+        if index.fract() != 0.0 || index.is_sign_negative() {
+            return Err(RuntimeError::new(paren, "List index must be a positive integer."));
+        }
+
+        let i = index as usize;
+        let value = self.evaluate(value)?;
+        if let Some(current) = list.borrow_mut().get_mut(i) {
+            *current = value.clone();
+            return Ok(value);
+        };
+        Err(RuntimeError::new(paren, "List index out of bounds."))
     }
 }
 

@@ -24,7 +24,6 @@ pub enum ExprKind {
     Grouping(Box<Expr>),
     Literal(token::Literal),
     Unary(Token, Box<Expr>),
-    Comma(Box<Expr>, Box<Expr>),
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
     Variable(Token),
     Assign(Token, Box<Expr>),
@@ -36,8 +35,8 @@ pub enum ExprKind {
     This(Token),
     Super(Token, Token),
     List(Vec<Expr>),
-    Index(Box<Expr>, Box<Expr>),
-    IndexSet(Box<Expr>, Box<Expr>, Box<Expr>),
+    Index(Box<Expr>, Box<Expr>, Token),
+    IndexSet(Box<Expr>, Box<Expr>, Box<Expr>, Token),
 }
 
 impl ExprKind {
@@ -55,10 +54,6 @@ impl ExprKind {
 
     pub fn grouping(expr: Expr) -> ExprKind {
         ExprKind::Grouping(Box::new(expr))
-    }
-
-    pub fn comma(left: Expr, right: Expr) -> ExprKind {
-        ExprKind::Comma(Box::new(left), Box::new(right))
     }
 
     pub fn ternary(cond: Expr, left: Expr, right: Expr) -> ExprKind {
@@ -85,12 +80,12 @@ impl ExprKind {
         ExprKind::Set(object, name, Box::new(value))
     }
 
-    pub fn index(list: Expr, index: Expr) -> ExprKind {
-        ExprKind::Index(Box::new(list), Box::new(index))
+    pub fn index(list: Expr, index: Expr, paren: Token) -> ExprKind {
+        ExprKind::Index(Box::new(list), Box::new(index), paren)
     }
 
-    pub fn index_set(list: Expr, index: Expr, value: Expr) -> ExprKind {
-        ExprKind::IndexSet(Box::new(list), Box::new(index), Box::new(value))
+    pub fn index_set(list: Box<Expr>, index: Box<Expr>, value: Expr, paren: Token) -> ExprKind {
+        ExprKind::IndexSet(list, index, Box::new(value), paren)
     }
 }
 
@@ -100,7 +95,6 @@ pub trait Visitor<R> {
     fn visit_grouping(&mut self, expression: &Expr) -> R;
     fn visit_literal(&mut self, literal: &token::Literal) -> R;
     fn visit_unary(&mut self, operator: &Token, right: &Expr) -> R;
-    fn visit_comma(&mut self, left: &Expr, right: &Expr) -> R;
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) -> R;
     fn visit_variable(&mut self, name: &Token, expr: &Expr) -> R;
     fn visit_assign(&mut self, name: &Token, expr: &Expr, value: &Expr) -> R;
@@ -111,8 +105,8 @@ pub trait Visitor<R> {
     fn visit_this(&mut self, keyword: &Token, expr: &Expr) -> R;
     fn visit_super(&mut self, keyword: &Token, method: &Token, expr: &Expr) -> R;
     fn visit_list(&mut self, exprs: &[Expr]) -> R;
-    fn visit_index(&mut self, list: &Expr, index: &Expr) -> R;
-    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr) -> R;
+    fn visit_index(&mut self, list: &Expr, index: &Expr, paren: &Token) -> R;
+    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr, paren: &Token) -> R;
 }
 
 impl Expr {
@@ -120,7 +114,6 @@ impl Expr {
         match &self.kind {
             ExprKind::Grouping(expression) => visitor.visit_grouping(expression),
             ExprKind::Literal(literal) => visitor.visit_literal(literal),
-            ExprKind::Comma(left, right) => visitor.visit_comma(left, right),
             ExprKind::Unary(operator, right) => visitor.visit_unary(operator, right),
             ExprKind::Binary(left, operator, right) => visitor.visit_binary(left, operator, right),
             ExprKind::Logical(left, operator, right) => visitor.visit_logical(left, operator, right),
@@ -134,8 +127,8 @@ impl Expr {
             ExprKind::This(keyword) => visitor.visit_this(keyword, self),
             ExprKind::Super(keyword, method) => visitor.visit_super(keyword, method, self),
             ExprKind::List(exprs) => visitor.visit_list(exprs),
-            ExprKind::Index(list, index) => visitor.visit_index(list, index),
-            ExprKind::IndexSet(list, index, value) => visitor.visit_index_set(list, index, value),
+            ExprKind::Index(list, index, paren) => visitor.visit_index(list, index, paren),
+            ExprKind::IndexSet(list, index, value, paren) => visitor.visit_index_set(list, index, value, paren),
         }
     }
 }

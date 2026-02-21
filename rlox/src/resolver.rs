@@ -165,11 +165,6 @@ impl expr::Visitor<()> for Resolver<'_> {
         self._resolve(right);
     }
 
-    fn visit_comma(&mut self, left: &Expr, right: &Expr) {
-        self._resolve(left);
-        self._resolve(right);
-    }
-
     fn visit_ternary(&mut self, cond: &Expr, left: &Expr, right: &Expr) {
         self._resolve(cond);
         self._resolve(left);
@@ -235,12 +230,15 @@ impl expr::Visitor<()> for Resolver<'_> {
         exprs.iter().for_each(|e| self._resolve(e));
     }
 
-    fn visit_index(&mut self, list: &Expr, index: &Expr) -> () {
-        todo!()
+    fn visit_index(&mut self, list: &Expr, index: &Expr, _paren: &Token) {
+        self._resolve(list);
+        self._resolve(index);
     }
 
-    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr) -> () {
-        todo!()
+    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr, _paren: &Token) {
+        self._resolve(list);
+        self._resolve(index);
+        self._resolve(value);
     }
 }
 

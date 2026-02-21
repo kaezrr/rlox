@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    fmt::{Display, write},
-    rc::Rc,
-};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use crate::{callable::Callable, class::LoxInstance};
 
