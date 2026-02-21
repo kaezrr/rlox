@@ -26,6 +26,15 @@ This is the language reference for Lox as implemented in `rlox`. For a general i
 
 ## Operators
 
+### Comments
+
+```lox
+// This is a single line comment
+
+/* This is a
+   multiline comment */
+```
+
 ### Arithmetic
 
 | Operator    | Description               |
@@ -315,6 +324,7 @@ Redefining native functions is a **semantic error**.
 - **Function declarations** `fun name() {}` is syntax sugar for `var name = fun() {}`.
 - **Ternary operator** `condition ? then : else`.
 - **Break statement** `break` inside loops.
+- **Multi-line comments** added comments that can span multiple lines.
 - **Static methods** declared with the `class` keyword inside a class body, called on the class itself, no access to `this`.
 - **Getters** methods declared without parentheses, accessed as properties.
 - **Native functions** added `input`, `number`, `push`, `pop`, `len` beyond the book's `clock`.
