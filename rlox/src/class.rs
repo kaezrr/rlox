@@ -64,7 +64,15 @@ impl LoxClass {
     }
 
     pub fn find_getter(&self, name: &str) -> Option<Rc<LoxFunction>> {
-        self.getters.get(name).cloned()
+        if let Some(getter) = self.getters.get(name) {
+            return Some(getter.clone());
+        }
+
+        if let Some(super_class) = &self.super_class {
+            return super_class.find_getter(name);
+        }
+
+        None
     }
 
     pub fn find_static(&self, name: &str) -> Option<Rc<LoxFunction>> {
