@@ -51,7 +51,7 @@ impl LoxClass {
         Ok(ExecSignal::Return(Literal::Instance(instance)))
     }
 
-    fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {
+    pub fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {
         if let Some(method) = self.methods.get(name) {
             return Some(method.clone());
         }
@@ -63,7 +63,7 @@ impl LoxClass {
         None
     }
 
-    fn find_getter(&self, name: &str) -> Option<Rc<LoxFunction>> {
+    pub fn find_getter(&self, name: &str) -> Option<Rc<LoxFunction>> {
         self.getters.get(name).cloned()
     }
 

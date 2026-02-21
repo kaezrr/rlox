@@ -572,7 +572,7 @@ impl<'a> Parser<'a> {
     }
 
     /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER |
-    /// Lambda
+    /// Lambda | "super" "." IDENTIFIER
     fn primary(&mut self) -> ParseExprResult {
         // Literals
         let next_tokens_to_match = [
@@ -604,6 +604,16 @@ impl<'a> Parser<'a> {
 
         if self.advance_if(&[TokenType::Fun]) {
             return self.lambda(None, "function", LambdaType::Function);
+        }
+
+        if self.advance_if(&[TokenType::Super]) {
+            let keyword = self.previous().clone();
+            self.consume(TokenType::Dot, "Expect '.' after 'super'.")?;
+            let method = self
+                .consume(TokenType::Identifier, "Expect superclass method name.")?
+                .clone();
+
+            return Ok(self.build_expr(ExprKind::Super(keyword, method)));
         }
 
         Err(self.error(self.peek().clone(), "Expect expression."))

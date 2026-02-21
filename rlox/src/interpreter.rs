@@ -294,6 +294,40 @@ impl expr::Visitor<EvalResult> for Interpreter {
     fn visit_this(&mut self, keyword: &Token, expr: &Expr) -> EvalResult {
         self.look_up_variable(keyword, expr)
     }
+
+    fn visit_super(&mut self, keyword: &Token, method: &Token, expr: &Expr) -> EvalResult {
+        let distance = self.locals.get(&expr.id).unwrap();
+
+        let super_class = {
+            let Literal::Callable(callable) = self.current_scope.borrow().get_at(*distance, keyword) else {
+                return Err(RuntimeError::new(keyword, "'super' must be a class."));
+            };
+            let Kind::Class(x) = &callable.kind else {
+                return Err(RuntimeError::new(keyword, "'super' must be a class."));
+            };
+            x.clone()
+        };
+
+        let Literal::Instance(object) = self.current_scope.borrow().get_at(
+            *distance - 1,
+            &Token::new(TokenType::This, "this".to_string(), None, keyword.line),
+        ) else {
+            return Err(RuntimeError::new(keyword, "'this' must be class instance."));
+        };
+
+        let Some(super_method) = super_class.find_method(&method.lexeme) else {
+            return Err(RuntimeError::new(
+                method,
+                &format!("Undefined property '{}'", method.lexeme),
+            ));
+        };
+
+        Ok(Literal::Callable(
+            super_method
+                .bind(object)
+                .callable_method(&keyword.lexeme, &method.lexeme),
+        ))
+    }
 }
 
 fn is_equal(left: &Literal, right: &Literal) -> bool {
@@ -392,23 +426,31 @@ impl stmt::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_class(&mut self, class_name: &Token, superclass: Option<&Expr>, methods: &[Stmt]) -> ExecResult {
-        let superclass = if let Some(expr) = superclass {
+        let (superclass, eval) = if let Some(expr) = superclass {
             let value = self.evaluate(expr)?;
-            let Literal::Callable(callable) = value else {
+            let Literal::Callable(callable) = value.clone() else {
                 return Err(RuntimeError::new(class_name, "Superclass must be a class."));
             };
             let Kind::Class(class) = &callable.kind else {
                 return Err(RuntimeError::new(class_name, "Superclass must be a class."));
             };
 
-            Some(Rc::new(class.clone()))
+            (Some(Rc::new(class.clone())), Some(value))
         } else {
-            None
+            (None, None)
         };
 
-        let mut current_scope = self.current_scope.borrow_mut();
+        self.current_scope
+            .borrow_mut()
+            .define(class_name.lexeme.clone(), Literal::Nil);
 
-        current_scope.define(class_name.lexeme.clone(), Literal::Nil);
+        if let Some(value) = eval {
+            self.current_scope = Rc::new(RefCell::new(Scope {
+                enclosing: Some(self.current_scope.clone()),
+                ..Default::default()
+            }));
+            self.current_scope.borrow_mut().define("super".to_string(), value);
+        }
 
         let mut methods_map = HashMap::new();
         let mut statics_map = HashMap::new();
@@ -464,6 +506,14 @@ impl stmt::Visitor<ExecResult> for Interpreter {
             }
         }
 
+        if superclass.is_some() {
+            let enclosing = {
+                let scope = self.current_scope.borrow();
+                scope.enclosing.clone().expect("Expected enclosing scope")
+            };
+            self.current_scope = enclosing;
+        }
+
         let class = LoxClass::new(
             class_name.lexeme.clone(),
             superclass,
@@ -472,7 +522,9 @@ impl stmt::Visitor<ExecResult> for Interpreter {
             getters_map,
         );
 
-        current_scope.assign(class_name, Literal::Callable(class.callable(arity)))?;
+        self.current_scope
+            .borrow_mut()
+            .assign(class_name, Literal::Callable(class.callable(arity)))?;
 
         Ok(ExecSignal::None)
     }
