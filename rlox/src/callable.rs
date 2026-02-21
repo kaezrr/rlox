@@ -9,7 +9,7 @@ use std::{
 use crate::{
     class::{LoxClass, LoxInstance},
     environment::Scope,
-    interpreter::{ExecResult, ExecSignal, Interpreter},
+    interpreter::{ExecResult, ExecSignal, Interpreter, RuntimeError},
     stmt::Stmt,
     token::{Literal, Token, TokenType},
 };
@@ -29,11 +29,11 @@ pub struct Callable {
 }
 
 impl Callable {
-    pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
+    pub fn call(&self, interpreter: &mut Interpreter, paren: &Token, args: Vec<Literal>) -> ExecResult {
         match &self.kind {
-            Kind::NativeFunction(native_fn) => native_fn.call(),
+            Kind::NativeFunction(native_fn) => native_fn.call(paren, &args),
             Kind::LoxFunction(user_function) => user_function.call(interpreter, args),
-            Kind::Class(class) => class.call(interpreter, args),
+            Kind::Class(class) => class.call(interpreter, paren, args),
         }
     }
 
@@ -123,14 +123,20 @@ pub enum NativeFunction {
     NativeClock(NativeClock),
     ReadNumber(ReadNumber),
     ReadString(ReadString),
+    PushArray(PushArray),
+    PopArray(PopArray),
+    LenArray(LenArray),
 }
 
 impl NativeFunction {
-    pub fn call(&self) -> ExecResult {
+    pub fn call(&self, paren: &Token, args: &[Literal]) -> ExecResult {
         match self {
             NativeFunction::NativeClock(clock) => clock.call(),
             NativeFunction::ReadNumber(read_num) => read_num.call(),
             NativeFunction::ReadString(read_str) => read_str.call(),
+            NativeFunction::PushArray(push_array) => push_array.call(paren, args),
+            NativeFunction::PopArray(pop_array) => pop_array.call(paren, args),
+            NativeFunction::LenArray(len_array) => len_array.call(paren, args),
         }
     }
 }
@@ -141,6 +147,13 @@ pub struct ReadNumber;
 pub struct ReadString;
 #[derive(Debug)]
 pub struct NativeClock;
+
+#[derive(Debug)]
+pub struct PushArray;
+#[derive(Debug)]
+pub struct PopArray;
+#[derive(Debug)]
+pub struct LenArray;
 
 impl NativeClock {
     pub fn callable() -> Rc<Callable> {
@@ -194,5 +207,57 @@ impl ReadString {
             stdin().read_line(&mut line).unwrap();
             line.trim_end_matches("\n").to_string()
         })))
+    }
+}
+
+impl PushArray {
+    pub fn callable() -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: 2,
+            name: "<native fn>".to_string(),
+            kind: Kind::NativeFunction(NativeFunction::PushArray(PushArray)),
+        })
+    }
+
+    fn call(&self, paren: &Token, args: &[Literal]) -> ExecResult {
+        let Literal::List(list) = &args[0] else {
+            return Err(RuntimeError::new(paren, "Can only push to lists."));
+        };
+        list.borrow_mut().push(args[1].clone());
+        Ok(ExecSignal::None)
+    }
+}
+
+impl PopArray {
+    pub fn callable() -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: 1,
+            name: "<native fn>".to_string(),
+            kind: Kind::NativeFunction(NativeFunction::PopArray(PopArray)),
+        })
+    }
+
+    fn call(&self, paren: &Token, args: &[Literal]) -> ExecResult {
+        let Literal::List(list) = &args[0] else {
+            return Err(RuntimeError::new(paren, "Can only pop from lists."));
+        };
+        Ok(ExecSignal::Return(list.borrow_mut().pop().unwrap_or(Literal::Nil)))
+    }
+}
+
+impl LenArray {
+    pub fn callable() -> Rc<Callable> {
+        Rc::new(Callable {
+            arity: 1,
+            name: "<native fn>".to_string(),
+            kind: Kind::NativeFunction(NativeFunction::LenArray(LenArray)),
+        })
+    }
+
+    fn call(&self, paren: &Token, args: &[Literal]) -> ExecResult {
+        let Literal::List(list) = &args[0] else {
+            return Err(RuntimeError::new(paren, "Can only get length from lists."));
+        };
+        Ok(ExecSignal::Return(Literal::Number(list.borrow().len() as f64)))
     }
 }

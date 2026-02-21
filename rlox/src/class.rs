@@ -40,12 +40,12 @@ impl LoxClass {
         }
     }
 
-    pub fn call(&self, interpreter: &mut Interpreter, args: Vec<Literal>) -> ExecResult {
+    pub fn call(&self, interpreter: &mut Interpreter, paren: &Token, args: Vec<Literal>) -> ExecResult {
         let instance = Rc::new(RefCell::new(LoxInstance::new(self.clone())));
 
         if let Some(initializer) = self.find_method("init") {
             let init = initializer.bind(instance.clone()).callable_method(&self.name, "init");
-            init.call(interpreter, args)?;
+            init.call(interpreter, paren, args)?;
         }
 
         Ok(ExecSignal::Return(Literal::Instance(instance)))

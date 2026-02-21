@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    callable::{Callable, Kind, LoxFunction, NativeClock, ReadNumber, ReadString},
+    callable::{Callable, Kind, LenArray, LoxFunction, NativeClock, PopArray, PushArray, ReadNumber, ReadString},
     class::LoxClass,
     environment::Scope,
     expr::{self, Expr, ExprId, ExprKind},
@@ -21,6 +21,9 @@ impl Default for Interpreter {
         globals.define("clock".into(), Literal::Callable(NativeClock::callable()));
         globals.define("readString".into(), Literal::Callable(ReadString::callable()));
         globals.define("readNumber".into(), Literal::Callable(ReadNumber::callable()));
+        globals.define("push".into(), Literal::Callable(PushArray::callable()));
+        globals.define("pop".into(), Literal::Callable(PopArray::callable()));
+        globals.define("len".into(), Literal::Callable(LenArray::callable()));
 
         let global_scope = Rc::new(RefCell::new(globals));
 
@@ -242,7 +245,7 @@ impl expr::Visitor<EvalResult> for Interpreter {
             ));
         }
 
-        function.call(self, args).map(|x| match x {
+        function.call(self, paren, args).map(|x| match x {
             ExecSignal::None => Literal::Nil,
             ExecSignal::Return(literal) => literal,
             _ => unreachable!(),
@@ -337,6 +340,11 @@ fn is_equal(left: &Literal, right: &Literal) -> bool {
         (Literal::Boolean(a), Literal::Boolean(b)) => a == b,
         (Literal::Nil, Literal::Nil) => true,
         (Literal::Callable(a), Literal::Callable(b)) => Rc::ptr_eq(a, b),
+        (Literal::List(v1), Literal::List(v2)) => {
+            let v1 = v1.borrow();
+            let v2 = v2.borrow();
+            v1.len() == v2.len() && v1.iter().zip(v2.iter()).all(|(a, b)| is_equal(a, b))
+        }
         _ => false,
     }
 }

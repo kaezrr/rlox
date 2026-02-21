@@ -1,4 +1,8 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::{
+    cell::RefCell,
+    fmt::{Display, write},
+    rc::Rc,
+};
 
 use crate::{callable::Callable, class::LoxInstance};
 
@@ -64,6 +68,8 @@ impl Scanner {
             ')' => self.add_token(TokenType::RightParen),
             '{' => self.add_token(TokenType::LeftBrace),
             '}' => self.add_token(TokenType::RightBrace),
+            '[' => self.add_token(TokenType::LeftBracket),
+            ']' => self.add_token(TokenType::RightBracket),
             ',' => self.add_token(TokenType::Comma),
             '.' => self.add_token(TokenType::Dot),
             '-' => self.add_token(TokenType::Minus),
@@ -303,6 +309,8 @@ pub enum TokenType {
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Comma,
     Dot,
     Minus,
@@ -355,6 +363,7 @@ pub enum TokenType {
 pub enum Literal {
     Callable(Rc<Callable>),
     Instance(Rc<RefCell<LoxInstance>>),
+    List(Rc<RefCell<Vec<Literal>>>),
     Number(f64),
     String(String),
     Boolean(bool),
@@ -370,6 +379,10 @@ impl Display for Literal {
             Literal::Nil => write!(f, "nil"),
             Literal::Callable(v) => write!(f, "{}", v.name),
             Literal::Instance(v) => write!(f, "{}", v.borrow()),
+            Literal::List(v) => {
+                let items: Vec<String> = v.borrow().iter().map(|lit| lit.to_string()).collect();
+                write!(f, "[{}]", items.join(", "))
+            }
         }
     }
 }
