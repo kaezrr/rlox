@@ -20,51 +20,77 @@ An educational project made with the intention of learning about compilers and p
 - Ternary and loops and conditionals
 - Number conversion and other helpful native functions
 
-## Example
+## Examples
+
+### Closures
 
 ```lox
-// Fibonacci with recursion
+fun makeAdder(n) {
+    return fun(x) { return x + n; };
+}
+var addFive = makeAdder(5);
+print addFive(3);  // 8
+print addFive(10); // 15
+```
+
+### Lists and Higher-Order Functions
+
+```lox
+fun map(list, f) {
+    var result = [];
+    var i = 0;
+    while (i < len(list)) {
+        push(result, f(list[i]));
+        i = i + 1;
+    }
+    return result;
+}
+
+var nums = [1, 2, 3, 4, 5];
+var doubled = map(nums, fun(x) { return x * 2; });
+print doubled; // [2, 4, 6, 8, 10]
+```
+
+### Classes and Inheritance
+
+```lox
+class Shape {
+    init(color) { this.color = color; }
+    describe { return this.color + " " + this.name; }
+    class create(color) { return Shape(color); }
+}
+
+class Circle < Shape {
+    init(color, radius) {
+        super.init(color);
+        this.radius = radius;
+    }
+    name { return "circle"; }
+    area { return 3.14159 * this.radius * this.radius; }
+}
+
+var c = Circle("red", 5);
+print c.describe; // red circle
+print c.area;     // 78.53...
+```
+
+### Ternary
+
+```lox
+fun printShape(shape) {
+    var kind = shape.area > 50 ? "large" : "small";
+    print shape.describe + " is " + kind;
+}
+```
+
+### Recursion
+
+```lox
 fun fib(n) {
     if (n <= 1) return n;
     return fib(n - 1) + fib(n - 2);
 }
-
-// Class with state and methods
-class Counter {
-    init(start) {
-        this.value = start;
-    }
-
-    inc() {
-        this.value = this.value + 1;
-    }
-
-    get() {
-        return this.value;
-    }
-}
-
-// Closure example
-fun makeAdder(x) {
-    fun add(y) {
-        return x + y;
-    }
-    return add;
-}
-
-// Arrays + native len()
-var numbers = [1, 2, 3];
-print "Length:", len(numbers);
-
-var c = Counter(10);
-c.inc();
-c.inc();
-print "Counter value:", c.get();
-
-var addFive = makeAdder(5);
-print "5 + 10 =", addFive(10);
-
-print "fib(6) =", fib(6);
+print fib(10); // 55
 ```
 
 ## Language Reference
