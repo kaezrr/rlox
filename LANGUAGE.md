@@ -319,15 +319,15 @@ Redefining native functions is a **semantic error**.
 
 ## Differences from the Book
 
-- **Lists** added list literals, indexing, and index assignment.
-- **Lambdas** anonymous functions using `fun(params) { ... }` syntax.
-- **Function declarations** `fun name() {}` is syntax sugar for `var name = fun() {}`.
-- **Ternary operator** `condition ? then : else`.
-- **Break statement** `break` inside loops.
-- **Multi-line comments** added comments that can span multiple lines.
-- **Static methods** declared with the `class` keyword inside a class body, called on the class itself, no access to `this`.
-- **Getters** methods declared without parentheses, accessed as properties.
-- **Native functions** added `input`, `number`, `push`, `pop`, `len` beyond the book's `clock`.
-- **Unused variables** unused local variables are a semantic error.
-- **Uninitialized variables** using a variable before it is assigned is a semantic error.
-- **Native redefinition** redefining native functions is a semantic error.
+- **Lists** - added list literals, indexing, and index assignment.
+- **Lambdas** - anonymous functions using `fun(params) { ... }` syntax.
+- **Function declarations** - `fun name() {}` is syntax sugar for `var name = fun() {}`.
+- **Ternary operator** - `condition ? then : else`.
+- **Break statement** - `break` inside loops.
+- **Multi-line comments** - added comments that can span multiple lines.
+- **Static methods** - declared with the `class` keyword inside a class body, called on the class itself, no access to `this`.
+- **Getters** - methods declared without parentheses, accessed as properties.
+- **Native functions** - added `input`, `number`, `push`, `pop`, `len` beyond the book's `clock`.
+- **Unused variables** - unused local variables are a semantic error.
+- **Uninitialized variables** - using a variable before it is assigned is a semantic error.
+- **Native redefinition** - redefining native functions is a semantic error.
