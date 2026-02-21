@@ -230,6 +230,18 @@ impl expr::Visitor<()> for Resolver<'_> {
             ClassType::SubClass => self.resolve_local(keyword, expr),
         }
     }
+
+    fn visit_list(&mut self, exprs: &[Expr]) {
+        exprs.iter().for_each(|e| self._resolve(e));
+    }
+
+    fn visit_index(&mut self, list: &Expr, index: &Expr) -> () {
+        todo!()
+    }
+
+    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr) -> () {
+        todo!()
+    }
 }
 
 impl stmt::Visitor<()> for Resolver<'_> {

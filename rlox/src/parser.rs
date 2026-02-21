@@ -320,30 +320,9 @@ impl<'a> Parser<'a> {
         Ok(body)
     }
 
-    /// expression -> comma
+    /// expression -> assignment
     fn expression(&mut self) -> ParseExprResult {
-        self.comma()
-    }
-
-    /// comma -> assignment ("," assignment)*
-    fn comma(&mut self) -> ParseExprResult {
-        // Missing left operand
-        if self.check(&[TokenType::Comma]) {
-            let err = self.error(self.peek().clone(), "Expect expression before comma");
-            while self.advance_if(&[TokenType::Comma]) {
-                let _ = self.assignment();
-            }
-            return Err(err);
-        }
-
-        let mut expr = self.assignment()?;
-
-        while self.advance_if(&[TokenType::Comma]) {
-            let right = self.assignment()?;
-            expr = self.build_expr(ExprKind::comma(expr, right));
-        }
-
-        Ok(expr)
+        self.assignment()
     }
 
     /// assignment -> (call ".")? IDENTIFIER "=" assignment | ternary
@@ -549,18 +528,18 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// arguments -> assignment ("," assignment)*
+    /// arguments -> expression ("," expression)*
     fn arguments(&mut self, callee: Expr) -> ParseExprResult {
         let mut arguments = Vec::new();
         if !self.check(&[TokenType::RightParen]) {
-            arguments.push(self.assignment()?);
+            arguments.push(self.expression()?);
 
             while self.advance_if(&[TokenType::Comma]) {
                 if arguments.len() >= 255 {
                     let err = self.error(self.peek().clone(), "Can't have more than 255 arguments.");
                     self.errors.push(err);
                 }
-                arguments.push(self.assignment()?);
+                arguments.push(self.expression()?);
             }
         }
 
@@ -572,7 +551,7 @@ impl<'a> Parser<'a> {
     }
 
     /// primary -> NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER |
-    /// Lambda | "super" "." IDENTIFIER
+    /// Lambda | "super" "." IDENTIFIER | List
     fn primary(&mut self) -> ParseExprResult {
         // Literals
         let next_tokens_to_match = [
@@ -606,6 +585,10 @@ impl<'a> Parser<'a> {
             return self.lambda(None, "function", LambdaType::Function);
         }
 
+        if self.advance_if(&[TokenType::LeftBracket]) {
+            return self.list();
+        }
+
         if self.advance_if(&[TokenType::Super]) {
             let keyword = self.previous().clone();
             self.consume(TokenType::Dot, "Expect '.' after 'super'.")?;
@@ -617,6 +600,20 @@ impl<'a> Parser<'a> {
         }
 
         Err(self.error(self.peek().clone(), "Expect expression."))
+    }
+
+    /// List -> "[" (expression ("," expression)*)? "]"
+    fn list(&mut self) -> ParseExprResult {
+        let mut body = Vec::new();
+        if !self.check(&[TokenType::RightBracket]) && !self.is_at_end() {
+            body.push(self.expression()?);
+            while self.advance_if(&[TokenType::Comma]) {
+                body.push(self.expression()?);
+            }
+        }
+
+        self.consume(TokenType::RightBracket, "Expect ']' after list body.")?;
+        Ok(self.build_expr(ExprKind::List(body)))
     }
 
     fn synchronize(&mut self) {

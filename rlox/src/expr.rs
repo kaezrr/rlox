@@ -35,6 +35,9 @@ pub enum ExprKind {
     Set(Box<Expr>, Token, Box<Expr>),
     This(Token),
     Super(Token, Token),
+    List(Vec<Expr>),
+    Index(Box<Expr>, Box<Expr>),
+    IndexSet(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 impl ExprKind {
@@ -81,6 +84,14 @@ impl ExprKind {
     pub fn set(object: Box<Expr>, name: Token, value: Expr) -> ExprKind {
         ExprKind::Set(object, name, Box::new(value))
     }
+
+    pub fn index(list: Expr, index: Expr) -> ExprKind {
+        ExprKind::Index(Box::new(list), Box::new(index))
+    }
+
+    pub fn index_set(list: Expr, index: Expr, value: Expr) -> ExprKind {
+        ExprKind::IndexSet(Box::new(list), Box::new(index), Box::new(value))
+    }
 }
 
 pub trait Visitor<R> {
@@ -99,6 +110,9 @@ pub trait Visitor<R> {
     fn visit_set(&mut self, object: &Expr, name: &Token, value: &Expr) -> R;
     fn visit_this(&mut self, keyword: &Token, expr: &Expr) -> R;
     fn visit_super(&mut self, keyword: &Token, method: &Token, expr: &Expr) -> R;
+    fn visit_list(&mut self, exprs: &[Expr]) -> R;
+    fn visit_index(&mut self, list: &Expr, index: &Expr) -> R;
+    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr) -> R;
 }
 
 impl Expr {
@@ -119,6 +133,9 @@ impl Expr {
             ExprKind::Set(object, name, value) => visitor.visit_set(object, name, value),
             ExprKind::This(keyword) => visitor.visit_this(keyword, self),
             ExprKind::Super(keyword, method) => visitor.visit_super(keyword, method, self),
+            ExprKind::List(exprs) => visitor.visit_list(exprs),
+            ExprKind::Index(list, index) => visitor.visit_index(list, index),
+            ExprKind::IndexSet(list, index, value) => visitor.visit_index_set(list, index, value),
         }
     }
 }

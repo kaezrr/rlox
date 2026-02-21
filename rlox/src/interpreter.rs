@@ -331,6 +331,23 @@ impl expr::Visitor<EvalResult> for Interpreter {
                 .callable_method(&keyword.lexeme, &method.lexeme),
         ))
     }
+
+    fn visit_list(&mut self, exprs: &[Expr]) -> EvalResult {
+        let mut list = Vec::new();
+        for expr in exprs {
+            list.push(self.evaluate(expr)?);
+        }
+
+        Ok(Literal::List(Rc::new(RefCell::new(list))))
+    }
+
+    fn visit_index(&mut self, list: &Expr, index: &Expr) -> EvalResult {
+        todo!()
+    }
+
+    fn visit_index_set(&mut self, list: &Expr, index: &Expr, value: &Expr) -> EvalResult {
+        todo!()
+    }
 }
 
 fn is_equal(left: &Literal, right: &Literal) -> bool {
