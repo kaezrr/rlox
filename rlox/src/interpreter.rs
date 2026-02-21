@@ -391,7 +391,21 @@ impl stmt::Visitor<ExecResult> for Interpreter {
         Ok(ExecSignal::Return(value))
     }
 
-    fn visit_class(&mut self, class_name: &Token, methods: &[Stmt]) -> ExecResult {
+    fn visit_class(&mut self, class_name: &Token, superclass: Option<&Expr>, methods: &[Stmt]) -> ExecResult {
+        let superclass = if let Some(expr) = superclass {
+            let value = self.evaluate(expr)?;
+            let Literal::Callable(callable) = value else {
+                return Err(RuntimeError::new(class_name, "Superclass must be a class."));
+            };
+            let Kind::Class(class) = &callable.kind else {
+                return Err(RuntimeError::new(class_name, "Superclass must be a class."));
+            };
+
+            Some(Rc::new(class.clone()))
+        } else {
+            None
+        };
+
         let mut current_scope = self.current_scope.borrow_mut();
 
         current_scope.define(class_name.lexeme.clone(), Literal::Nil);
@@ -450,7 +464,14 @@ impl stmt::Visitor<ExecResult> for Interpreter {
             }
         }
 
-        let class = LoxClass::new(class_name.lexeme.clone(), methods_map, statics_map, getters_map);
+        let class = LoxClass::new(
+            class_name.lexeme.clone(),
+            superclass,
+            methods_map,
+            statics_map,
+            getters_map,
+        );
+
         current_scope.assign(class_name, Literal::Callable(class.callable(arity)))?;
 
         Ok(ExecSignal::None)

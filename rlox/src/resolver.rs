@@ -283,12 +283,25 @@ impl stmt::Visitor<()> for Resolver<'_> {
         }
     }
 
-    fn visit_class(&mut self, name: &Token, methods: &[Stmt]) {
+    fn visit_class(&mut self, name: &Token, superclass: Option<&Expr>, methods: &[Stmt]) {
         let enclosing_class = self.current_class;
         self.current_class = ClassType::Class;
 
         self.declare(name);
         self.define(name);
+
+        if let Some(superclass) = superclass {
+            let ExprKind::Variable(supername) = &superclass.kind else {
+                self.error(name, "Superclass is not a variable.");
+                return;
+            };
+
+            if supername.lexeme == name.lexeme {
+                self.error(supername, "A class can't inherit from itself.");
+            }
+
+            self._resolve(superclass);
+        }
 
         self.begin_scope();
 

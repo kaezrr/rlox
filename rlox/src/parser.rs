@@ -79,9 +79,17 @@ impl<'a> Parser<'a> {
         self.statement()
     }
 
-    /// "class" IDENTIFIER "{" (function | staticFunction| getter)* "}"
+    /// "class" IDENTIFIER ("<" IDENTIFIER)? "{" (function | staticFunction | getter)* "}"
     fn class_declaration(&mut self) -> ParseStmtResult {
         let name = self.consume(TokenType::Identifier, "Expect class name.")?.clone();
+
+        let superclass = if self.advance_if(&[TokenType::Less]) {
+            self.consume(TokenType::Identifier, "Expect superclass name.")?;
+            Some(self.build_expr(ExprKind::Variable(self.previous().clone())))
+        } else {
+            None
+        };
+
         self.consume(TokenType::LeftBrace, "Expect '{' after class body")?;
 
         let mut methods = Vec::new();
@@ -95,7 +103,7 @@ impl<'a> Parser<'a> {
 
         self.consume(TokenType::RightBrace, "Expect '}' after class body")?;
 
-        Ok(Stmt::Class(name, methods))
+        Ok(Stmt::Class(name, superclass, methods))
     }
 
     /// funDecl -> lambda | "fun" IDENTIFIER "(" parameters? ")" block

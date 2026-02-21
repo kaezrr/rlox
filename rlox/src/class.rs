@@ -9,6 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     pub name: String,
+    super_class: Option<Rc<LoxClass>>,
     methods: HashMap<String, Rc<LoxFunction>>,
     statics: HashMap<String, Rc<LoxFunction>>,
     getters: HashMap<String, Rc<LoxFunction>>,
@@ -25,12 +26,14 @@ impl LoxClass {
 
     pub fn new(
         name: String,
+        super_class: Option<Rc<LoxClass>>,
         methods: HashMap<String, Rc<LoxFunction>>,
         statics: HashMap<String, Rc<LoxFunction>>,
         getters: HashMap<String, Rc<LoxFunction>>,
     ) -> Self {
         Self {
             name,
+            super_class,
             methods,
             statics,
             getters,
@@ -49,7 +52,15 @@ impl LoxClass {
     }
 
     fn find_method(&self, name: &str) -> Option<Rc<LoxFunction>> {
-        self.methods.get(name).cloned()
+        if let Some(method) = self.methods.get(name) {
+            return Some(method.clone());
+        }
+
+        if let Some(super_class) = &self.super_class {
+            return super_class.find_method(name);
+        }
+
+        None
     }
 
     fn find_getter(&self, name: &str) -> Option<Rc<LoxFunction>> {
