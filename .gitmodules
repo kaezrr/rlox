@@ -1,0 +1,3 @@
+[submodule "tree-sitter-lox"]
+	path = tree-sitter-lox
+	url = https://github.com/kaezrr/tree-sitter-lox
