@@ -1,6 +1,6 @@
 # Lox Language Reference
 
-This is the language reference for Lox as implemented in `rlox`. For a general introduction to Lox, see [Crafting Interpreters](https://craftinginterpreters.com/contents.html) by Robert Nystrom. This document focuses on the specifics of this implementation and its extensions beyond the book.
+This is the language reference for Lox. For a general introduction to Lox, see [Crafting Interpreters](https://craftinginterpreters.com/contents.html) by Robert Nystrom. This document focuses on the specifics of this implementation and its extensions beyond the book.
 
 ## Table of Contents
 
@@ -65,6 +65,29 @@ This is the language reference for Lox as implemented in `rlox`. For a general i
 | `or`     | Logical or  |
 | `!`      | Logical not |
 
+### Operator Overloading
+
+The `+` operator supports mixed string and number operands by coercing the number to its string representation:
+
+| Left   | Right  | Result               |
+| ------ | ------ | -------------------- |
+| number | number | numeric addition     |
+| string | string | string concatenation |
+| string | number | string concatenation |
+| number | string | string concatenation |
+
+The comparison operators `<`, `<=`, `>`, `>=` work on both numbers (numeric order) and strings (lexicographic order), but mixing the two types is a runtime error.
+
+### Truthiness
+
+Lox follows Ruby's rule: `false` and `nil` are falsy, and everything else is truthy, including `0` and empty strings.
+
+```lox
+if (0)   print "truthy"; // truthy
+if ("")  print "truthy"; // truthy
+if (nil) print "truthy"; // not printed
+```
+
 ### Ternary
 
 ```lox
@@ -72,8 +95,6 @@ var result = condition ? then_value : else_value;
 ```
 
 ## Grammar
-
-In **script mode**, the top level accepts declarations and statements. In **REPL mode**, a single expression is also valid at the top level.
 
 ```
 program        -> declaration* EOF ;
@@ -308,7 +329,7 @@ print matrix[0][1]; // 2
 
 | Function | Signature           | Description                                          |
 | -------- | ------------------- | ---------------------------------------------------- |
-| `clock`  | `clock()`           | Returns elapsed time in seconds since program start  |
+| `clock`  | `clock()`           | Returns elapsed time in seconds since the Unix epoch |
 | `input`  | `input()`           | Reads a line from stdin as a string                  |
 | `number` | `number(value)`     | Converts a value to a number, runtime error if fails |
 | `push`   | `push(list, value)` | Appends a value to the end of a list                 |
@@ -319,6 +340,7 @@ Redefining native functions is a **semantic error**.
 
 ## Differences from the Book
 
+- **Modulo operator** - added `%` for remainder division.
 - **Lists** - added list literals, indexing, and index assignment.
 - **Lambdas** - anonymous functions using `fun(params) { ... }` syntax.
 - **Function declarations** - `fun name() {}` is syntax sugar for `var name = fun() {}`.
