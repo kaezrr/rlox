@@ -1,0 +1,40 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "lox",
+      "camelcase": "Lox",
+      "title": "Lox",
+      "scope": "source.lox",
+      "file-types": ["lox"],
+      "injection-regex": "^lox$",
+      "class-name": "TreeSitterLox",
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "A dynamically typed programming language blending object-oriented and functional programming.",
+    "authors": [
+      {
+        "name": "Anjishnu Banerjee",
+        "email": "kaezr.dev@gmail.com",
+        "url": "https://github.com/kaezrr"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/kaezrr/lox",
+      "funding": "https://buymeacoffee.com/kaezr"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "node": true,
+    "python": true,
+    "rust": true,
+    "swift": true,
+    "zig": false
+  }
+}
