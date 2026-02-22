@@ -1,6 +1,6 @@
 ## Lox
 
-Two implementations of the Lox Language:
+Two implementations of the Lox Language, with my own modifications:
 
 - `rlox` -> A tree-walk interpreter written in Rust
 - `zlox` -> A bytecode virtual machine in Zig
@@ -95,4 +95,4 @@ print fib(10); // 55
 
 ## Language Reference
 
-For full grammar rules, native functions, and differences from the book see [LANGUAGE.md](LANGUAGE.md).
+The language isn't a 1:1 copy of the original Lox from the book, I have added various modifications of my own for convenience and challenge. For full grammar rules, native functions, and differences from the book see [LANGUAGE.md](LANGUAGE.md).
