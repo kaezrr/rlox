@@ -463,8 +463,10 @@ impl stmt::Visitor<ExecResult> for Interpreter {
 
     fn visit_while(&mut self, condition: &Expr, body: &Stmt) -> ExecResult {
         while self.evaluate(condition)?.is_truthy() {
-            if let ExecSignal::Break = self.execute(body)? {
-                break;
+            match self.execute(body)? {
+                ExecSignal::None => {}
+                ExecSignal::Return(literal) => return Ok(ExecSignal::Return(literal)),
+                ExecSignal::Break => break,
             }
         }
 
