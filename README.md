@@ -1,10 +1,6 @@
 ## Lox
 
-Two implementations of the Lox Language, with my own modifications:
-
-- `rlox` -> A tree-walk interpreter written in Rust
-- `zlox` -> A bytecode virtual machine in Zig
-
+An implementation of the Lox Language, with my own modifications.  
 An educational project made with the intention of learning about compilers and programming languages.
 
 **Referred books:** [Crafting Interpreters](https://craftinginterpreters.com/contents.html) by Robert Nystrom
